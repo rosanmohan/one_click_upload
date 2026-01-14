@@ -1,0 +1,24 @@
+# Environment Variables
+.env
+backend/.env
+
+# Dependencies
+node_modules/
+backend/venv/
+__pycache__/
+
+# Build outputs
+dist/
+build/
+
+# IDEs
+.vscode/
+.idea/
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Secrets
+client_secret.json
+youtube_token.json

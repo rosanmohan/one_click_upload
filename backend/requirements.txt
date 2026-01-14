@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+python-dotenv
+requests
+google-auth-oauthlib
+google-auth
+google-api-python-client
+python-multipart
+cloudinary

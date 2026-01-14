@@ -1,0 +1,152 @@
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+import shutil
+import os
+import uuid
+import logging
+
+from app.config import settings
+from app.services.youtube_service import upload_to_youtube
+from app.services.facebook_service import upload_to_facebook
+from app.services.instagram_service import upload_to_instagram
+
+# Configure Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="One Click Social Upload")
+
+# Allow CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create uploads directory if not exists
+# We place it in the parent directory of 'app' usually, or inside app. 
+# Let's place it at the root of the backend folder to avoid cluttering app code.
+UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
+
+@app.post("/api/upload")
+async def upload_video(
+    file: UploadFile = File(...),
+    description: str = Form(...),
+    hashtags: str = Form(""),
+    title: str = Form(None)
+):
+    logger.info(f"--- NEW UPLOAD REQUEST ---")
+    logger.info(f"Filename: {file.filename}")
+    logger.info(f"Title: {title}")
+    logger.info(f"Description length: {len(description)}")
+    
+    if not settings.ALLOW_UPLOAD:
+        logger.warning("Uploads are globally disabled (ALLOW_UPLOAD=false)")
+        return {"results": [{"platform": "all", "status": "skipped", "message": "Uploads disabled globally"}]}
+
+    # Generate unique filename
+    file_extension = file.filename.split(".")[-1]
+    filename = f"{uuid.uuid4()}.{file_extension}"
+    file_path = os.path.join(UPLOAD_DIR, filename)
+    
+    # Save file
+    try:
+        logger.info(f"Saving file to {file_path}")
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+        logger.info(f"File saved successfully. Size: {os.path.getsize(file_path)} bytes")
+    except Exception as e:
+        logger.error(f"Failed to save file: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="File save failed")
+        
+    # Construct full description
+    full_description = f"{description}\n\n{hashtags}"
+    # Use title if provided, else use first line of description (truncated)
+    video_title = title if title else description.split('\n')[0][:100]
+    
+    # Prepare public URL for Instagram
+    video_url = f"{settings.BASE_URL}/static/{filename}"
+    logger.info(f"Generated Public URL: {video_url}")
+    
+    results = []
+    
+    # 1. YouTube
+    if settings.UPLOAD_YOUTUBE:
+        logger.info("[YOUTUBE] Starting upload...")
+        try:
+            yt_res = upload_to_youtube(file_path, video_title, full_description, list(filter(None, hashtags.split())))
+            logger.info(f"[YOUTUBE] Result: {yt_res}")
+            results.append(yt_res)
+        except Exception as e:
+            logger.error(f"[YOUTUBE] Critical Failure: {e}", exc_info=True)
+            results.append({"status": "error", "platform": "youtube", "message": str(e)})
+    else:
+        logger.info("[YOUTUBE] Skipped (disabled in config)")
+        results.append({"platform": "youtube", "status": "skipped"})
+        
+    # 2. Facebook
+    if settings.UPLOAD_FACEBOOK:
+        logger.info("[FACEBOOK] Starting upload...")
+        try:
+            fb_res = upload_to_facebook(file_path, full_description, video_title)
+            logger.info(f"[FACEBOOK] Result: {fb_res}")
+            results.append(fb_res)
+        except Exception as e:
+            logger.error(f"[FACEBOOK] Critical Failure: {e}", exc_info=True)
+            results.append({"status": "error", "platform": "facebook", "message": str(e)})
+    else:
+        logger.info("[FACEBOOK] Skipped (disabled in config)")
+        results.append({"platform": "facebook", "status": "skipped"})
+        
+    # 3. Instagram
+    if settings.UPLOAD_INSTAGRAM:
+        logger.info("[INSTAGRAM] Starting upload...")
+        try:
+            # Try Cloudinary first if credentials exist
+            cloudinary_data = None
+            if settings.CLOUDINARY_CLOUD_NAME:
+                from app.services.cloudinary_service import upload_video_to_cloudinary, delete_video_from_cloudinary
+                logger.info("[INSTAGRAM] Uploading to Cloudinary for valid URL...")
+                cloudinary_data = upload_video_to_cloudinary(file_path)
+                logger.info(f"[INSTAGRAM] Cloudinary uploaded: {cloudinary_data}")
+                
+            if cloudinary_data and cloudinary_data.get("url"):
+                # Use Cloudinary URL
+                ig_url = cloudinary_data.get("url")
+                logger.info(f"[INSTAGRAM] Using Cloudinary URL: {ig_url}")
+                ig_res = upload_to_instagram(ig_url, full_description)
+                logger.info(f"[INSTAGRAM] Upload Result: {ig_res}")
+                
+                # Clean up Cloudinary
+                logger.info(f"[INSTAGRAM] Deleting from Cloudinary (ID: {cloudinary_data.get('public_id')})")
+                delete_video_from_cloudinary(cloudinary_data.get("public_id"))
+            else:
+                # Fallback to local URL (won't work for real Instagram unless tunnelled)
+                logger.warning("[INSTAGRAM] Cloudinary failed or not configured. Using local URL (likely to fail via API).")
+                ig_res = upload_to_instagram(video_url, full_description)
+                logger.info(f"[INSTAGRAM] Upload Result: {ig_res}")
+                
+            results.append(ig_res)
+        except Exception as e:
+            logger.error(f"[INSTAGRAM] Critical Failure: {e}", exc_info=True)
+            results.append({"status": "error", "platform": "instagram", "message": str(e)})
+    else:
+        logger.info("[INSTAGRAM] Skipped (disabled in config)")
+        results.append({"platform": "instagram", "status": "skipped"})
+        
+    return {"results": results, "file_path": file_path, "public_url": video_url}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
