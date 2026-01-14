@@ -1,18 +1,24 @@
 import requests
 import os
-from app.config import settings
 
-def upload_to_facebook(file_path, description, title=None):
-    if not settings.UPLOAD_FACEBOOK:
+def upload_to_facebook(file_path, description, title=None, config=None):
+    if config is None:
+        # Should not happen in new flow
+        return {"status": "error", "platform": "facebook", "message": "No config provided"}
+
+    if not config.get("UPLOAD_FACEBOOK"):
         return {"status": "skipped", "platform": "facebook"}
 
-    if not settings.FACEBOOK_PAGE_ID or not settings.FACEBOOK_ACCESS_TOKEN:
+    page_id = config.get("FACEBOOK_PAGE_ID")
+    access_token = config.get("FACEBOOK_ACCESS_TOKEN")
+
+    if not page_id or not access_token:
          return {"status": "error", "platform": "facebook", "message": "Missing Page ID or Access Token"}
 
-    url = f"https://graph-video.facebook.com/v18.0/{settings.FACEBOOK_PAGE_ID}/videos"
+    url = f"https://graph-video.facebook.com/v18.0/{page_id}/videos"
     
     payload = {
-        'access_token': settings.FACEBOOK_ACCESS_TOKEN,
+        'access_token': access_token,
         'description': description,
         'title': title or description[:50]
     }
