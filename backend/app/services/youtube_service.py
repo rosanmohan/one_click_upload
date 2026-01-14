@@ -57,7 +57,7 @@ def upload_to_youtube(file_path, title, description, tags):
             'categoryId': '22' # People & Blogs
         },
         'status': {
-            'privacyStatus': 'private', # Safer default
+            'privacyStatus': 'public', 
             'selfDeclaredMadeForKids': False
         }
     }
