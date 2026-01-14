@@ -109,25 +109,34 @@ function App() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Description</label>
+            <label className="form-label">Description (Optional)</label>
             <textarea
               className="form-textarea"
               placeholder="What is this video about?"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              required
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Hashtags</label>
-            <input
-              type="text"
+            <label className="form-label">Select Hashtags (Optional)</label>
+            <select
               className="form-input"
-              placeholder="#viral #trending #social"
               value={hashtags}
               onChange={(e) => setHashtags(e.target.value)}
-            />
+            >
+              <option value="">-- Select Hashtags --</option>
+              <option value="#viral #trending #reels">Viral & Trending (#viral #trending #reels)</option>
+              <option value="#comedy #funny #lol">Comedy & Fun (#comedy #funny #lol)</option>
+              <option value="#tech #innovation #gadgets">Technology (#tech #innovation)</option>
+              <option value="#travel #wanderlust #adventure">Travel (#travel #wanderlust)</option>
+              <option value="#food #foodie #delicious">Food & Cooking (#food #foodie)</option>
+              <option value="#fitness #gym #workout">Fitness & Health (#fitness #gym)</option>
+              <option value="#music #song #dance">Music & Dance (#music #song)</option>
+              <option value="#motivation #inspiration #quotes">Motivation (#motivation #quotes)</option>
+              <option value="#nature #beautiful #earth">Nature (#nature #beautiful)</option>
+              <option value="#gaming #gamer #stream">Gaming (#gaming #gamer)</option>
+            </select>
           </div>
 
           {error && <p style={{ color: '#f87171', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</p>}
