@@ -13,6 +13,8 @@ function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
 
+  const [uploadProgress, setUploadProgress] = useState(0);
+
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
@@ -34,6 +36,7 @@ function App() {
     }
     setError('');
     setLoading(true);
+    setUploadProgress(0);
     setResults(null);
 
     const formData = new FormData();
@@ -49,11 +52,15 @@ function App() {
 
       console.log(`[DEBUG] API Base URL detected: ${baseUrl}`);
       console.log(`[DEBUG] Starting upload request to: ${baseUrl}/api/upload`);
-      console.log(`[DEBUG] FormData entries:`, [...formData.entries()]);
 
       const response = await axios.post(`${baseUrl}/api/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
+        },
+        onUploadProgress: (progressEvent) => {
+          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+          setUploadProgress(percentCompleted);
+          console.log(`[DEBUG] Upload Progress: ${percentCompleted}%`);
         }
       });
       console.log(`[DEBUG] Upload Success:`, response.data);
@@ -70,6 +77,7 @@ function App() {
       setError("An error occurred during upload. Please check console for details.");
     } finally {
       setLoading(false);
+      setUploadProgress(0);
     }
   };
 
@@ -171,17 +179,28 @@ function App() {
 
           {error && <p style={{ color: '#f87171', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</p>}
 
+          {loading && uploadProgress < 100 && (
+            <div className="progress-container" style={{ marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
+                <span>Uploading Video...</span>
+                <span>{uploadProgress}%</span>
+              </div>
+              <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ height: '100%', background: '#8b5cf6', width: `${uploadProgress}%`, transition: 'width 0.3s ease' }}></div>
+              </div>
+            </div>
+          )}
+
+          {loading && uploadProgress === 100 && (
+            <div style={{ textAlign: 'center', marginBottom: '1rem', color: '#cbd5e1' }}>
+              <Loader2 className="animate-spin" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+              <p>Processing & Publishing to Platforms...</p>
+              <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>This may take a minute.</p>
+            </div>
+          )}
+
           <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin" size={20} />
-                Uploading...
-              </>
-            ) : (
-              <>
-                Upload to All Platforms
-              </>
-            )}
+            {loading ? 'Processing...' : 'Upload to All Platforms'}
           </button>
         </form>
 

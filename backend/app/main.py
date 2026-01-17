@@ -1,3 +1,43 @@
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException
+from fastapi.staticfiles import StaticFiles
+from fastapi.middleware.cors import CORSMiddleware
+import shutil
+import os
+import uuid
+import logging
+import sys
+
+from app.config import settings
+from app.services.youtube_service import upload_to_youtube
+from app.services.facebook_service import upload_to_facebook
+from app.services.instagram_service import upload_to_instagram
+
+# Configure Logging (Stdout for Render)
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout
+)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="One Click Social Upload")
+
+# Allow CORS for frontend
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Create uploads directory
+UPLOAD_DIR = os.path.join(os.getcwd(), "uploads")
+if not os.path.exists(UPLOAD_DIR):
+    os.makedirs(UPLOAD_DIR)
+
+app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
+
 @app.post("/api/upload")
 async def upload_video(
     file: UploadFile = File(...),
@@ -6,7 +46,7 @@ async def upload_video(
     title: str = Form(None),
     profile_id: str = Form(None)
 ):
-    logger.info(f"--- NEW UPLOAD REQUEST ---")
+    print(f"--- [START] NEW UPLOAD REQUEST ---", flush=True)
     logger.info(f"Filename: {file.filename}")
     logger.info(f"Profile ID: {profile_id}")
     
@@ -75,7 +115,7 @@ async def upload_video(
     if profile_config.get("UPLOAD_INSTAGRAM"):
         logger.info(f"[INSTAGRAM] Starting upload for profile {profile_id}...")
         try:
-            # Try Cloudinary first if credentials exist (Global setting usually, but can be per profile if needed)
+            # Try Cloudinary first if credentials exist
             cloudinary_data = None
             if settings.CLOUDINARY_CLOUD_NAME:
                 from app.services.cloudinary_service import upload_video_to_cloudinary, delete_video_from_cloudinary
@@ -94,8 +134,8 @@ async def upload_video(
                 logger.info(f"[INSTAGRAM] Deleting from Cloudinary (ID: {cloudinary_data.get('public_id')})")
                 delete_video_from_cloudinary(cloudinary_data.get("public_id"))
             else:
-                # Fallback to local URL (won't work for real Instagram unless tunnelled)
-                logger.warning("[INSTAGRAM] Cloudinary failed or not configured. Using local URL (likely to fail via API).")
+                # Fallback to local URL
+                logger.warning("[INSTAGRAM] Cloudinary failed or not configured. Using local URL.")
                 ig_res = upload_to_instagram(video_url, full_description, profile_config)
                 logger.info(f"[INSTAGRAM] Upload Result: {ig_res}")
                 
@@ -107,4 +147,13 @@ async def upload_video(
         logger.info("[INSTAGRAM] Skipped (disabled in profile config)")
         results.append({"platform": "instagram", "status": "skipped"})
         
+    print(f"--- [END] REQUEST PROCESSED ---", flush=True)
     return {"results": results, "file_path": file_path, "public_url": video_url}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok"}
+
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)
