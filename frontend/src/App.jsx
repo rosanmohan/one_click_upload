@@ -46,15 +46,28 @@ function App() {
     try {
       // Use environment variable if available, else fallback to local IP
       const baseUrl = import.meta.env.VITE_API_URL || 'http://192.168.1.3:8000';
+
+      console.log(`[DEBUG] API Base URL detected: ${baseUrl}`);
+      console.log(`[DEBUG] Starting upload request to: ${baseUrl}/api/upload`);
+      console.log(`[DEBUG] FormData entries:`, [...formData.entries()]);
+
       const response = await axios.post(`${baseUrl}/api/upload`, formData, {
         headers: {
           'Content-Type': 'multipart/form-data',
         }
       });
+      console.log(`[DEBUG] Upload Success:`, response.data);
       setResults(response.data.results);
     } catch (err) {
-      console.error(err);
-      setError("An error occurred during upload. Please ensure backend is running.");
+      console.error("[DEBUG] Upload Error Object:", err);
+      if (err.response) {
+        console.error("[DEBUG] Server responded with:", err.response.status, err.response.data);
+      } else if (err.request) {
+        console.error("[DEBUG] No response received. Request:", err.request);
+      } else {
+        console.error("[DEBUG] Error setting up request:", err.message);
+      }
+      setError("An error occurred during upload. Please check console for details.");
     } finally {
       setLoading(false);
     }
