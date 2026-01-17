@@ -1,6 +1,6 @@
 # One Click Social Upload
 
-A production-grade application to upload videos to Facebook, Instagram, and YouTube with a single click. Now supports multiple social media profiles!
+A production-grade application to upload videos to Facebook, Instagram, and YouTube with a single click.
 
 ## Structure
 
@@ -49,41 +49,30 @@ A production-grade application to upload videos to Facebook, Instagram, and YouT
  ```
  The frontend will run at `http://localhost:5173`.
 
-## Configuration (Multi-Profile)
+## Configuration
 
-You can configure up to 3 different profiles (e.g., different YouTube channels or Facebook pages).
-The system looks for environment variables prefixed with `PROFILE_{ID}_`.
+Update `backend/.env` with your actual API keys and tokens.
+Ensure `client_secret.json` and `youtube_token.json` are present in the `backend/` directory for YouTube uploads.
 
-### Default Profile (No prefix or Fallback)
-Variables: `UPLOAD_FACEBOOK`, `FACEBOOK_PAGE_ID`, `YOUTUBE_TOKEN_FILE` etc.
-
-### Profile 1 (e.g., Tech Channel)
-Add these to your `backend/.env`:
+### Environment Variables
 ```env
-PROFILE_1_ALLOW_UPLOAD=true
-PROFILE_1_UPLOAD_YOUTUBE=true
-PROFILE_1_UPLOAD_FACEBOOK=false
-PROFILE_1_YOUTUBE_TOKEN_FILE=youtube_token_1.json
-PROFILE_1_FACEBOOK_PAGE_ID=123456789
+UPLOAD_FACEBOOK=true
+FACEBOOK_PAGE_ID=...
+FACEBOOK_ACCESS_TOKEN=...
+UPLOAD_INSTAGRAM=true
+INSTAGRAM_BUSINESS_ACCOUNT_ID=...
+UPLOAD_YOUTUBE=true
+YOUTUBE_CLIENT_SECRET_FILE=client_secret.json
+YOUTUBE_TOKEN_FILE=youtube_token.json
 ```
-
-### Profile 2 (e.g., Vlog Channel)
-```env
-PROFILE_2_ALLOW_UPLOAD=true
-PROFILE_2_UPLOAD_YOUTUBE=true
-PROFILE_2_YOUTUBE_TOKEN_FILE=youtube_token_2.json
-```
-
-**YouTube Tokens**:
-- Ensure you have generated separate token files (e.g., `youtube_token_1.json`, `youtube_token_2.json`) by running the authentication flow for each channel.
 
 ## Usage
 
 1. **Desktop**: Open `http://localhost:5173`.
-2. **Select Profile**: Choose which profile you want to upload to from the dropdown.
-3. **Select Video**: Choose your video file.
-4. **Enter Details**: Title, Description, Hashtags.
-5. **Upload**: Click "Upload to All Platforms".
+2. **Select Video**: Choose your video file.
+3. **Enter Details**: Title, Description, Hashtags.
+4. **Upload**: Click "Upload to All Platforms".
+5. **Progress**: Watch the progress bar as the video uploads.
 
 **Note for Instagram**: 
 Instagram upload via API requires the video URL to be **publicly accessible** on the internet.
