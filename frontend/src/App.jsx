@@ -8,7 +8,6 @@ function App() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [hashtags, setHashtags] = useState('');
-  const [profile, setProfile] = useState('');
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
@@ -44,7 +43,6 @@ function App() {
     formData.append('title', title);
     formData.append('description', description);
     formData.append('hashtags', hashtags);
-    formData.append('profile_id', profile);
 
     try {
       // Use environment variable if available, else fallback to local IP
@@ -90,21 +88,6 @@ function App() {
         </header>
 
         <form onSubmit={handleSubmit}>
-          {/* Profile Selector */}
-          <div className="form-group">
-            <label className="form-label">Select Profile</label>
-            <select
-              className="form-input"
-              value={profile}
-              onChange={(e) => setProfile(e.target.value)}
-            >
-              <option value="">Default Profile</option>
-              <option value="1">Profile 1 (e.g., Tech Channel)</option>
-              <option value="2">Profile 2 (e.g., Vlog Channel)</option>
-              <option value="3">Profile 3 (e.g., Gaming Channel)</option>
-            </select>
-          </div>
-
           {/* File Upload */}
           <div className="form-group">
             <label className="form-label">Video File</label>

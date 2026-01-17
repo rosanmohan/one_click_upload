@@ -5,18 +5,16 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
+from app.config import settings
 
 SCOPES = ['https://www.googleapis.com/auth/youtube.upload']
 
-def get_authenticated_service(config):
+def get_authenticated_service():
     creds = None
-    token_file = config.get("YOUTUBE_TOKEN_FILE")
-    secret_file = config.get("YOUTUBE_CLIENT_SECRET_FILE")
-    
     # Check for token file
-    if os.path.exists(token_file):
+    if os.path.exists(settings.YOUTUBE_TOKEN_FILE):
         try:
-            creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+            creds = Credentials.from_authorized_user_file(settings.YOUTUBE_TOKEN_FILE, SCOPES)
         except Exception:
             creds = None
     
@@ -25,9 +23,9 @@ def get_authenticated_service(config):
             creds.refresh(Request())
         else:
             # Check if secret file exists
-            if os.path.exists(secret_file):
+            if os.path.exists(settings.YOUTUBE_CLIENT_SECRET_FILE):
                 flow = InstalledAppFlow.from_client_secrets_file(
-                    secret_file, SCOPES)
+                    settings.YOUTUBE_CLIENT_SECRET_FILE, SCOPES)
                 # This requires local interaction which might be hard in headless.
                 # Ideally user has token. If not, this might fail or hang if not handled.
                 # We assume user has the token or can run this once interactively.
@@ -37,17 +35,17 @@ def get_authenticated_service(config):
                 return None
         
         # Save the credentials for the next run
-        with open(token_file, 'w') as token:
+        with open(settings.YOUTUBE_TOKEN_FILE, 'w') as token:
             token.write(creds.to_json())
 
     return build('youtube', 'v3', credentials=creds)
 
-def upload_to_youtube(file_path, title, description, tags, config):
-    if not config.get("UPLOAD_YOUTUBE"):
+def upload_to_youtube(file_path, title, description, tags):
+    if not settings.UPLOAD_YOUTUBE:
         print("YouTube upload disabled in settings.")
         return {"status": "skipped", "platform": "youtube"}
 
-    youtube = get_authenticated_service(config)
+    youtube = get_authenticated_service()
     if not youtube:
         return {"status": "error", "platform": "youtube", "message": "Authentication failed or missing secrets"}
 
