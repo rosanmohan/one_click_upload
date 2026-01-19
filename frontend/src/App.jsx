@@ -104,18 +104,14 @@ function App() {
         </header>
 
         {/* Server Activation Section */}
-        <div className="server-status-section" style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div>
-              <h3 style={{ margin: 0, fontSize: '1rem' }}>Backend Server Status</h3>
-              <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>
-                {serverStatus === 'idle' && "Server might be sleeping (Free Tier)."}
-                {serverStatus === 'activating' && "Waking up server..."}
-                {serverStatus === 'active' && "Server is ready!"}
-                {serverStatus === 'error' && "Connection failed."}
-              </p>
-            </div>
-
+        {serverStatus !== 'active' && (
+          <div className="server-status-section" style={{
+            marginBottom: '1.5rem',
+            padding: '1rem',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center'
+          }}>
             {serverStatus === 'idle' || serverStatus === 'error' ? (
               <button
                 onClick={activateServer}
@@ -123,26 +119,56 @@ function App() {
                 style={{
                   background: '#e11d48',
                   border: 'none',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '6px',
+                  padding: '0.75rem 2rem',
+                  borderRadius: '8px',
                   color: 'white',
                   cursor: 'pointer',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '0.5rem'
+                  gap: '0.75rem',
+                  fontSize: '1.1rem',
+                  fontWeight: '600',
+                  boxShadow: '0 4px 14px 0 rgba(225, 29, 72, 0.39)',
+                  transition: 'transform 0.2s ease'
                 }}
+                onMouseOver={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseOut={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
-                <Power size={16} /> Activate
+                <Power size={20} /> Activate Server
               </button>
-            ) : serverStatus === 'activating' ? (
-              <Loader2 className="animate-spin" size={24} style={{ color: '#fbbf24' }} />
             ) : (
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4ade80' }}>
-                <CheckCircle size={20} /> Ready
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '0.5rem',
+                color: '#fbbf24'
+              }}>
+                <Loader2 className="animate-spin" size={32} />
+                <span style={{ fontSize: '0.9rem', fontWeight: '500' }}>Waking up server...</span>
               </div>
             )}
           </div>
-        </div>
+        )}
+
+        {serverStatus === 'active' && (
+          <div style={{
+            textAlign: 'center',
+            marginBottom: '2rem',
+            color: '#4ade80',
+            background: 'rgba(74, 222, 128, 0.1)',
+            padding: '0.75rem',
+            borderRadius: '8px',
+            border: '1px solid rgba(74, 222, 128, 0.2)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '0.5rem'
+          }}>
+            <CheckCircle size={20} />
+            <span style={{ fontWeight: '500' }}>Server Connected</span>
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} style={{ opacity: serverStatus === 'active' ? 1 : 0.5, pointerEvents: serverStatus === 'active' ? 'auto' : 'none', transition: 'opacity 0.3s' }}>
           {/* File Upload */}
