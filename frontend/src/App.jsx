@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2 } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -11,8 +11,27 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
+  const [serverStatus, setServerStatus] = useState('idle'); // idle, activating, active, error
 
   const [uploadProgress, setUploadProgress] = useState(0);
+
+  // Helper to get Base URL
+  const getBaseUrl = () => import.meta.env.VITE_API_URL || 'http://192.168.1.3:8000';
+
+  const activateServer = async () => {
+    setServerStatus('activating');
+    setError('');
+    try {
+      const baseUrl = getBaseUrl();
+      console.log(`[DEBUG] Activating server at: ${baseUrl}`);
+      await axios.get(`${baseUrl}/health`);
+      setServerStatus('active');
+    } catch (err) {
+      console.error("[DEBUG] Activation failed:", err);
+      setServerStatus('error');
+      setError("Failed to wake up server. Please try again.");
+    }
+  };
 
   const handleFileChange = (e) => {
     if (e.target.files && e.target.files[0]) {
@@ -45,10 +64,7 @@ function App() {
     formData.append('hashtags', hashtags);
 
     try {
-      // Use environment variable if available, else fallback to local IP
-      const baseUrl = import.meta.env.VITE_API_URL || 'http://192.168.1.3:8000';
-
-      console.log(`[DEBUG] API Base URL detected: ${baseUrl}`);
+      const baseUrl = getBaseUrl();
       console.log(`[DEBUG] Starting upload request to: ${baseUrl}/api/upload`);
 
       const response = await axios.post(`${baseUrl}/api/upload`, formData, {
@@ -87,7 +103,48 @@ function App() {
           <p>Upload once, publish everywhere.</p>
         </header>
 
-        <form onSubmit={handleSubmit}>
+        {/* Server Activation Section */}
+        <div className="server-status-section" style={{ marginBottom: '1.5rem', padding: '1rem', background: 'rgba(255,255,255,0.05)', borderRadius: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1rem' }}>Backend Server Status</h3>
+              <p style={{ margin: 0, fontSize: '0.8rem', opacity: 0.7 }}>
+                {serverStatus === 'idle' && "Server might be sleeping (Free Tier)."}
+                {serverStatus === 'activating' && "Waking up server..."}
+                {serverStatus === 'active' && "Server is ready!"}
+                {serverStatus === 'error' && "Connection failed."}
+              </p>
+            </div>
+
+            {serverStatus === 'idle' || serverStatus === 'error' ? (
+              <button
+                onClick={activateServer}
+                className="activate-btn"
+                style={{
+                  background: '#e11d48',
+                  border: 'none',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '6px',
+                  color: 'white',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}
+              >
+                <Power size={16} /> Activate
+              </button>
+            ) : serverStatus === 'activating' ? (
+              <Loader2 className="animate-spin" size={24} style={{ color: '#fbbf24' }} />
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', color: '#4ade80' }}>
+                <CheckCircle size={20} /> Ready
+              </div>
+            )}
+          </div>
+        </div>
+
+        <form onSubmit={handleSubmit} style={{ opacity: serverStatus === 'active' ? 1 : 0.5, pointerEvents: serverStatus === 'active' ? 'auto' : 'none', transition: 'opacity 0.3s' }}>
           {/* File Upload */}
           <div className="form-group">
             <label className="form-label">Video File</label>
