@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useRef } from 'react';
 import axios from 'axios';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -12,8 +12,10 @@ function App() {
   const [results, setResults] = useState(null);
   const [error, setError] = useState('');
   const [serverStatus, setServerStatus] = useState('idle'); // idle, activating, active, error
+  const [showModal, setShowModal] = useState(false);
 
   const [uploadProgress, setUploadProgress] = useState(0);
+  const abortControllerRef = useRef(null);
 
   // Helper to get Base URL
   const getBaseUrl = () => import.meta.env.VITE_API_URL || 'http://192.168.1.3:8000';
@@ -46,6 +48,16 @@ function App() {
     }
   };
 
+  const handleCancelUpload = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    setLoading(false);
+    setShowModal(false);
+    setUploadProgress(0);
+    setResults(null);
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!file) {
@@ -56,6 +68,10 @@ function App() {
     setLoading(true);
     setUploadProgress(0);
     setResults(null);
+    setShowModal(true);
+
+    // Create a new AbortController for this request
+    abortControllerRef.current = new AbortController();
 
     const formData = new FormData();
     formData.append('file', file);
@@ -71,6 +87,7 @@ function App() {
         headers: {
           'Content-Type': 'multipart/form-data',
         },
+        signal: abortControllerRef.current.signal,
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
           setUploadProgress(percentCompleted);
@@ -80,6 +97,10 @@ function App() {
       console.log(`[DEBUG] Upload Success:`, response.data);
       setResults(response.data.results);
     } catch (err) {
+      if (axios.isCancel(err)) {
+        console.log('Upload cancelled by user');
+        return; // Don't set error state if cancelled
+      }
       console.error("[DEBUG] Upload Error Object:", err);
       if (err.response) {
         console.error("[DEBUG] Server responded with:", err.response.status, err.response.data);
@@ -88,10 +109,18 @@ function App() {
       } else {
         console.error("[DEBUG] Error setting up request:", err.message);
       }
-      setError("An error occurred during upload. Please check console for details.");
+      // If modal is still open, show error there
+      // Otherwise set global error
+      if (showModal) {
+        // We might want to keep the modal open to show the error
+        // For now, let's keep it simple
+      }
+      setError("An error occurred during upload. " + err.message);
     } finally {
-      setLoading(false);
-      setUploadProgress(0);
+      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        setLoading(false);
+        setUploadProgress(0);
+      }
     }
   };
 
@@ -245,53 +274,76 @@ function App() {
 
           {error && <p style={{ color: '#f87171', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</p>}
 
-          {loading && uploadProgress < 100 && (
-            <div className="progress-container" style={{ marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
-                <span>Uploading Video...</span>
-                <span>{uploadProgress}%</span>
-              </div>
-              <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-                <div style={{ height: '100%', background: '#8b5cf6', width: `${uploadProgress}%`, transition: 'width 0.3s ease' }}></div>
-              </div>
-            </div>
-          )}
-
-          {loading && uploadProgress === 100 && (
-            <div style={{ textAlign: 'center', marginBottom: '1rem', color: '#cbd5e1' }}>
-              <Loader2 className="animate-spin" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
-              <p>Processing & Publishing to Platforms...</p>
-              <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>This may take a minute.</p>
-            </div>
-          )}
-
           <button type="submit" className="submit-btn" disabled={loading}>
             {loading ? 'Processing...' : 'Upload to All Platforms'}
           </button>
         </form>
+      </div>
 
-        {results && (
-          <div className="results-section">
-            <h3 style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>Upload Results</h3>
-            {results.map((res, idx) => (
-              <div key={idx} className="result-item">
-                <span className="result-platform">{res.platform}</span>
-                <div className="result-status">
-                  {res.status === 'success' && (
-                    <><CheckCircle size={18} className="status-success" /> Success</>
-                  )}
-                  {res.status === 'skipped' && (
-                    <><AlertCircle size={18} className="status-skipped" /> Skipped</>
-                  )}
-                  {res.status === 'error' && (
-                    <><XCircle size={18} className="status-error" /> Failed</>
-                  )}
+      {/* Modal for Upload Progress & Results */}
+      {showModal && (
+        <div className="modal-overlay">
+          <div className="modal-content">
+            <button className="close-btn" onClick={handleCancelUpload}>
+              <X size={24} />
+            </button>
+
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', textAlign: 'center' }}>
+              {loading ? 'Upload in Progress' : 'Upload Complete'}
+            </h2>
+
+            {/* Dynamic Status Message */}
+            <p style={{ textAlign: 'center', marginBottom: '1rem', color: '#cbd5e1' }}>
+              {loading ? (
+                <>{file?.name} uploading...</>
+              ) : (
+                <>{file?.name} uploaded successfully</>
+              )}
+            </p>
+
+            {loading && uploadProgress < 100 && (
+              <div className="progress-container" style={{ marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
+                  <span>Uploading...</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                  <div style={{ height: '100%', background: '#8b5cf6', width: `${uploadProgress}%`, transition: 'width 0.3s ease' }}></div>
                 </div>
               </div>
-            ))}
+            )}
+
+            {loading && uploadProgress === 100 && (
+              <div style={{ textAlign: 'center', marginBottom: '1rem', color: '#cbd5e1' }}>
+                <Loader2 className="animate-spin" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
+                <p>Processing & Publishing to Platforms...</p>
+                <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>This might take a minute.</p>
+              </div>
+            )}
+
+            {results && (
+              <div className="results-section" style={{ marginTop: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
+                {results.map((res, idx) => (
+                  <div key={idx} className="result-item">
+                    <span className="result-platform">{res.platform}</span>
+                    <div className="result-status">
+                      {res.status === 'success' && (
+                        <><CheckCircle size={18} className="status-success" /> Success</>
+                      )}
+                      {res.status === 'skipped' && (
+                        <><AlertCircle size={18} className="status-skipped" /> Skipped</>
+                      )}
+                      {res.status === 'error' && (
+                        <><XCircle size={18} className="status-error" /> Failed</>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
