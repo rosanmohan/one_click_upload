@@ -1,20 +1,21 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2 } from 'lucide-react';
 import './App.css';
 
 function App() {
-  const [file, setFile] = useState(null);
+  const [files, setFiles] = useState([]);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [hashtags, setHashtags] = useState('');
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState(null);
+  const [uploadQueue, setUploadQueue] = useState([]); // [{ file, status: 'pending'|'uploading'|'success'|'error', progress: 0, result: null }]
   const [error, setError] = useState('');
   const [serverStatus, setServerStatus] = useState('idle'); // idle, activating, active, error
   const [showModal, setShowModal] = useState(false);
 
-  const [uploadProgress, setUploadProgress] = useState(0);
+  // currentFileIndex tracks which file is currently being processed in the loop
+  const [currentFileIndex, setCurrentFileIndex] = useState(-1);
   const abortControllerRef = useRef(null);
 
   // Helper to get Base URL
@@ -36,16 +37,22 @@ function App() {
   };
 
   const handleFileChange = (e) => {
-    if (e.target.files && e.target.files[0]) {
-      setFile(e.target.files[0]);
+    if (e.target.files && e.target.files.length > 0) {
+      const newFiles = Array.from(e.target.files);
+      setFiles(prev => [...prev, ...newFiles]);
     }
   };
 
   const handleDrop = (e) => {
     e.preventDefault();
-    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
-      setFile(e.dataTransfer.files[0]);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const newFiles = Array.from(e.dataTransfer.files);
+      setFiles(prev => [...prev, ...newFiles]);
     }
+  };
+
+  const removeFile = (index) => {
+    setFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleCancelUpload = () => {
@@ -54,74 +61,97 @@ function App() {
     }
     setLoading(false);
     setShowModal(false);
-    setUploadProgress(0);
-    setResults(null);
+    setCurrentFileIndex(-1);
+    setUploadQueue([]);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!file) {
-      setError("Please select a video file first.");
+    if (files.length === 0) {
+      setError("Please select at least one video file.");
       return;
     }
     setError('');
     setLoading(true);
-    setUploadProgress(0);
-    setResults(null);
     setShowModal(true);
 
-    // Create a new AbortController for this request
-    abortControllerRef.current = new AbortController();
+    // Initialize Queue
+    const initialQueue = files.map(f => ({
+      file: f,
+      status: 'pending',
+      progress: 0,
+      results: null,
+      errorMsg: ''
+    }));
+    setUploadQueue(initialQueue);
+    setCurrentFileIndex(0);
 
-    const formData = new FormData();
-    formData.append('file', file);
-    formData.append('title', title);
-    formData.append('description', description);
-    formData.append('hashtags', hashtags);
+    const baseUrl = getBaseUrl();
 
-    try {
-      const baseUrl = getBaseUrl();
-      console.log(`[DEBUG] Starting upload request to: ${baseUrl}/api/upload`);
+    // Iterate sequentially
+    for (let i = 0; i < initialQueue.length; i++) {
+      const queueItem = initialQueue[i];
+      setCurrentFileIndex(i);
 
-      const response = await axios.post(`${baseUrl}/api/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-        signal: abortControllerRef.current.signal,
-        onUploadProgress: (progressEvent) => {
-          const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
-          setUploadProgress(percentCompleted);
-          console.log(`[DEBUG] Upload Progress: ${percentCompleted}%`);
-        }
+      // Update status to uploading
+      setUploadQueue(prev => {
+        const newQ = [...prev];
+        newQ[i].status = 'uploading';
+        return newQ;
       });
-      console.log(`[DEBUG] Upload Success:`, response.data);
-      setResults(response.data.results);
-    } catch (err) {
-      if (axios.isCancel(err)) {
-        console.log('Upload cancelled by user');
-        return; // Don't set error state if cancelled
-      }
-      console.error("[DEBUG] Upload Error Object:", err);
-      if (err.response) {
-        console.error("[DEBUG] Server responded with:", err.response.status, err.response.data);
-      } else if (err.request) {
-        console.error("[DEBUG] No response received. Request:", err.request);
-      } else {
-        console.error("[DEBUG] Error setting up request:", err.message);
-      }
-      // If modal is still open, show error there
-      // Otherwise set global error
-      if (showModal) {
-        // We might want to keep the modal open to show the error
-        // For now, let's keep it simple
-      }
-      setError("An error occurred during upload. " + err.message);
-    } finally {
-      if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
-        setLoading(false);
-        setUploadProgress(0);
+
+      abortControllerRef.current = new AbortController();
+
+      const formData = new FormData();
+      formData.append('file', queueItem.file);
+      // Use global title if only 1 file, else let backend determine or use filename
+      formData.append('title', files.length === 1 ? title : '');
+      formData.append('description', description);
+      formData.append('hashtags', hashtags);
+
+      try {
+        console.log(`[DEBUG] Starting upload for ${queueItem.file.name}`);
+        const response = await axios.post(`${baseUrl}/api/upload`, formData, {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          signal: abortControllerRef.current.signal,
+          onUploadProgress: (progressEvent) => {
+            const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            setUploadQueue(prev => {
+              const newQ = [...prev];
+              newQ[i].progress = percent;
+              return newQ;
+            });
+          }
+        });
+
+        // Success
+        setUploadQueue(prev => {
+          const newQ = [...prev];
+          newQ[i].status = 'success';
+          newQ[i].results = response.data.results;
+          newQ[i].progress = 100;
+          return newQ;
+        });
+
+      } catch (err) {
+        if (axios.isCancel(err)) {
+          console.log('Upload cancelled');
+          // If cancelled, stop loop
+          break;
+        }
+        console.error(`[DEBUG] Error uploading ${queueItem.file.name}:`, err);
+        setUploadQueue(prev => {
+          const newQ = [...prev];
+          newQ[i].status = 'error';
+          newQ[i].errorMsg = err.response?.data?.detail || err.message;
+          return newQ;
+        });
+        // Continue to next file even if one fails? Yes, usually better UX.
       }
     }
+
+    setLoading(false);
+    // Keep modal open to show results
   };
 
   return (
@@ -202,7 +232,7 @@ function App() {
         <form onSubmit={handleSubmit} style={{ opacity: serverStatus === 'active' ? 1 : 0.5, pointerEvents: serverStatus === 'active' ? 'auto' : 'none', transition: 'opacity 0.3s' }}>
           {/* File Upload */}
           <div className="form-group">
-            <label className="form-label">Video File</label>
+            <label className="form-label">Video Files</label>
             <div
               className="file-upload-zone"
               onDrop={handleDrop}
@@ -214,20 +244,37 @@ function App() {
                 id="fileInput"
                 className="file-input"
                 accept="video/*"
+                multiple
                 onChange={handleFileChange}
               />
-              {!file ? (
-                <>
-                  <Upload className="upload-icon" />
-                  <p style={{ margin: 0, color: '#94a3b8' }}>Click or drag video here</p>
-                </>
-              ) : (
-                <div className="file-info">
-                  <FileVideo size={18} />
-                  <span>{file.name}</span>
-                </div>
-              )}
+              <Upload className="upload-icon" />
+              <p style={{ margin: 0, color: '#94a3b8' }}>
+                Click to add videos or drag them here
+              </p>
             </div>
+
+            {/* File List */}
+            {files.length > 0 && (
+              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {files.map((f, i) => (
+                  <div key={i} className="file-info" style={{ justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <FileVideo size={18} />
+                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                        {f.name}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => removeFile(i)}
+                      style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px' }}
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -235,14 +282,15 @@ function App() {
             <input
               type="text"
               className="form-input"
-              placeholder="Amazing Video Title"
+              placeholder={files.length > 1 ? "Ignored for multiple files (filenames will be used)" : "Amazing Video Title"}
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              disabled={files.length > 1}
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Description (Optional)</label>
+            <label className="form-label">Description (for all videos)</label>
             <textarea
               className="form-textarea"
               placeholder="What is this video about?"
@@ -252,7 +300,7 @@ function App() {
           </div>
 
           <div className="form-group">
-            <label className="form-label">Select Hashtags (Optional)</label>
+            <label className="form-label">Hashtags (for all videos)</label>
             <select
               className="form-input"
               value={hashtags}
@@ -274,72 +322,87 @@ function App() {
 
           {error && <p style={{ color: '#f87171', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</p>}
 
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'Processing...' : 'Upload to All Platforms'}
+          <button type="submit" className="submit-btn" disabled={loading || files.length === 0}>
+            {loading ? 'Processing Queue...' : `Upload ${files.length > 0 ? files.length : ''} Video${files.length !== 1 ? 's' : ''}`}
           </button>
         </form>
       </div>
 
-      {/* Modal for Upload Progress & Results */}
+      {/* Modal for Upload Queue & Progress */}
       {showModal && (
         <div className="modal-overlay">
-          <div className="modal-content">
+          <div className="modal-content" style={{ maxHeight: '90vh', display: 'flex', flexDirection: 'column' }}>
             <button className="close-btn" onClick={handleCancelUpload}>
               <X size={24} />
             </button>
 
-            <h2 style={{ fontSize: '1.25rem', marginBottom: '1.5rem', textAlign: 'center' }}>
-              {loading ? 'Upload in Progress' : 'Upload Complete'}
+            <h2 style={{ fontSize: '1.25rem', marginBottom: '1rem', textAlign: 'center' }}>
+              {loading ? 'Processing Uploads' : 'Queue Complete'}
             </h2>
 
-            {/* Dynamic Status Message */}
-            <p style={{ textAlign: 'center', marginBottom: '1rem', color: '#cbd5e1' }}>
-              {loading ? (
-                <>{file?.name} uploading...</>
-              ) : (
-                <>{file?.name} uploaded successfully</>
-              )}
-            </p>
-
-            {loading && uploadProgress < 100 && (
-              <div className="progress-container" style={{ marginBottom: '1rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.9rem', color: '#cbd5e1' }}>
-                  <span>Uploading...</span>
-                  <span>{uploadProgress}%</span>
-                </div>
-                <div style={{ height: '8px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
-                  <div style={{ height: '100%', background: '#8b5cf6', width: `${uploadProgress}%`, transition: 'width 0.3s ease' }}></div>
-                </div>
-              </div>
-            )}
-
-            {loading && uploadProgress === 100 && (
-              <div style={{ textAlign: 'center', marginBottom: '1rem', color: '#cbd5e1' }}>
-                <Loader2 className="animate-spin" style={{ margin: '0 auto 0.5rem', display: 'block' }} />
-                <p>Processing & Publishing to Platforms...</p>
-                <p style={{ fontSize: '0.8rem', opacity: 0.7 }}>This might take a minute.</p>
-              </div>
-            )}
-
-            {results && (
-              <div className="results-section" style={{ marginTop: '1rem', maxHeight: '300px', overflowY: 'auto' }}>
-                {results.map((res, idx) => (
-                  <div key={idx} className="result-item">
-                    <span className="result-platform">{res.platform}</span>
-                    <div className="result-status">
-                      {res.status === 'success' && (
-                        <><CheckCircle size={18} className="status-success" /> Success</>
-                      )}
-                      {res.status === 'skipped' && (
-                        <><AlertCircle size={18} className="status-skipped" /> Skipped</>
-                      )}
-                      {res.status === 'error' && (
-                        <><XCircle size={18} className="status-error" /> Failed</>
-                      )}
-                    </div>
+            <div style={{ overflowY: 'auto', paddingRight: '0.5rem', flex: 1 }}>
+              {uploadQueue.map((item, index) => (
+                <div key={index} style={{
+                  background: 'rgba(255,255,255,0.05)',
+                  marginBottom: '1rem',
+                  borderRadius: '8px',
+                  padding: '1rem',
+                  border: currentFileIndex === index ? '1px solid #8b5cf6' : '1px solid transparent'
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+                    <span style={{ fontWeight: '500', fontSize: '0.9rem', color: 'white' }}>{item.file.name}</span>
+                    <span style={{ fontSize: '0.8rem', opacity: 0.7, textTransform: 'capitalize' }}>
+                      {item.status === 'uploading' && item.progress === 100 ? 'Finishing...' : item.status}
+                    </span>
                   </div>
-                ))}
-              </div>
+
+                  {/* Progress Bar for Pending/Uploading */}
+                  {(item.status === 'pending' || item.status === 'uploading') && (
+                    <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '4px', overflow: 'hidden' }}>
+                      <div style={{
+                        height: '100%',
+                        background: item.status === 'pending' ? 'transparent' : '#8b5cf6',
+                        width: `${item.progress}%`,
+                        transition: 'width 0.3s ease'
+                      }}></div>
+                    </div>
+                  )}
+
+                  {/* Error Msg */}
+                  {item.status === 'error' && (
+                    <div style={{ color: '#f87171', fontSize: '0.85rem', marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      <XCircle size={14} /> {item.errorMsg || 'Upload failed'}
+                    </div>
+                  )}
+
+                  {/* Success Results */}
+                  {item.status === 'success' && item.results && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                      {item.results.map((res, ridx) => (
+                        <div key={ridx} style={{
+                          fontSize: '0.75rem',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          background: res.status === 'success' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.1)',
+                          color: res.status === 'success' ? '#4ade80' : '#cbd5e1',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}>
+                          {res.status === 'success' ? <CheckCircle size={12} /> : (res.status === 'error' ? <XCircle size={12} /> : <AlertCircle size={12} />)}
+                          {res.platform}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            {!loading && (
+              <button onClick={handleCancelUpload} className="submit-btn" style={{ marginTop: '1rem' }}>
+                Close
+              </button>
             )}
           </div>
         </div>
