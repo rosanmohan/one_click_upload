@@ -82,5 +82,7 @@ def upload_to_youtube(file_path, title, description, tags):
         print(f"YouTube Upload Complete. ID: {response.get('id')}")
         return {"status": "success", "platform": "youtube", "data": response}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         print(f"YouTube Upload Failed: {e}")
-        return {"status": "error", "platform": "youtube", "message": str(e)}
+        return {"status": "error", "platform": "youtube", "message": f"{str(e)}"}

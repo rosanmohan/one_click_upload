@@ -379,18 +379,26 @@ function App() {
                   {item.status === 'success' && item.results && (
                     <div style={{ marginTop: '0.5rem', display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
                       {item.results.map((res, ridx) => (
-                        <div key={ridx} style={{
-                          fontSize: '0.75rem',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          background: res.status === 'success' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.1)',
-                          color: res.status === 'success' ? '#4ade80' : '#cbd5e1',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '4px'
-                        }}>
-                          {res.status === 'success' ? <CheckCircle size={12} /> : (res.status === 'error' ? <XCircle size={12} /> : <AlertCircle size={12} />)}
-                          {res.platform}
+                        <div key={ridx} style={{ display: 'flex', flexDirection: 'column', marginBottom: res.status === 'error' ? '0.5rem' : '0', width: res.status === 'error' ? '100%' : 'auto' }}>
+                          <div style={{
+                            fontSize: '0.75rem',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: res.status === 'success' ? 'rgba(74, 222, 128, 0.2)' : 'rgba(255,255,255,0.1)',
+                            color: res.status === 'success' ? '#4ade80' : '#cbd5e1',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px',
+                            width: 'fit-content'
+                          }}>
+                            {res.status === 'success' ? <CheckCircle size={12} /> : (res.status === 'error' ? <XCircle size={12} /> : <AlertCircle size={12} />)}
+                            {res.platform}
+                          </div>
+                          {res.status === 'error' && res.message && (
+                            <div style={{ color: '#f87171', fontSize: '0.75rem', marginTop: '2px', paddingLeft: '4px', wordBreak: 'break-word' }}>
+                              Error: {res.message}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
