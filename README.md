@@ -66,6 +66,23 @@ YOUTUBE_CLIENT_SECRET_FILE=client_secret.json
 YOUTUBE_TOKEN_FILE=youtube_token.json
 ```
 
+### 🔴 Fix YouTube Token Expiration (Important)
+By default, Google tokens generated in "Testing" mode expire in **7 days**. To fix this:
+
+1. Go to **Google Cloud Console** > **APIs & Services** > **OAuth consent screen**.
+2. Under "Publishing status", click **PUBLISH APP** to promote it to "In production".
+   - You **do not** need to submit for verification if you are the only user.
+   - Just confirm the dialog.
+3. Once in "Production", your refresh tokens will **never expire** (unless unused for 6 months).
+
+### Regenerate YouTube Token
+If your token has expired (error: `invalid_grant`), run the generator script:
+```bash
+cd backend
+python generate_token.py
+```
+This will open a browser for you to login and create a new `youtube_token.json`.
+
 ## Usage
 
 1. **Desktop**: Open `http://localhost:5173`.
