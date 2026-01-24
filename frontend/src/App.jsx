@@ -14,6 +14,8 @@ function App() {
   const [serverStatus, setServerStatus] = useState('idle'); // idle, activating, active, error
   const [showModal, setShowModal] = useState(false);
 
+  const [mergeVideos, setMergeVideos] = useState(false);
+
   // currentFileIndex tracks which file is currently being processed in the loop
   const [currentFileIndex, setCurrentFileIndex] = useState(-1);
   const abortControllerRef = useRef(null);
@@ -75,42 +77,34 @@ function App() {
     setLoading(true);
     setShowModal(true);
 
-    // Initialize Queue
-    const initialQueue = files.map(f => ({
-      file: f,
-      status: 'pending',
-      progress: 0,
-      results: null,
-      errorMsg: ''
-    }));
-    setUploadQueue(initialQueue);
-    setCurrentFileIndex(0);
-
     const baseUrl = getBaseUrl();
 
-    // Iterate sequentially
-    for (let i = 0; i < initialQueue.length; i++) {
-      const queueItem = initialQueue[i];
-      setCurrentFileIndex(i);
-
-      // Update status to uploading
-      setUploadQueue(prev => {
-        const newQ = [...prev];
-        newQ[i].status = 'uploading';
-        return newQ;
-      });
+    // --- MERGE LOGIC ---
+    if (mergeVideos && files.length > 1) {
+      // 1. Setup Queue for Single Merged Item
+      const mergedItem = {
+        file: { name: `Merged Video (${files.length} clips)` },
+        status: 'uploading',
+        progress: 0,
+        results: null,
+        errorMsg: ''
+      };
+      setUploadQueue([mergedItem]);
+      setCurrentFileIndex(0);
 
       abortControllerRef.current = new AbortController();
-
       const formData = new FormData();
-      formData.append('file', queueItem.file);
-      // Use global title if only 1 file, else let backend determine or use filename
-      formData.append('title', files.length === 1 ? title : '');
+
+      // Append all files to 'files' key (Backend expects List[UploadFile] at 'files')
+      files.forEach(f => formData.append('files', f));
+
+      formData.append('title', title);
       formData.append('description', description);
       formData.append('hashtags', hashtags);
+      formData.append('merge', 'true');
 
       try {
-        console.log(`[DEBUG] Starting upload for ${queueItem.file.name}`);
+        console.log(`[DEBUG] Starting merged upload for ${files.length} files`);
         const response = await axios.post(`${baseUrl}/api/upload`, formData, {
           headers: { 'Content-Type': 'multipart/form-data' },
           signal: abortControllerRef.current.signal,
@@ -118,7 +112,7 @@ function App() {
             const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
             setUploadQueue(prev => {
               const newQ = [...prev];
-              newQ[i].progress = percent;
+              if (newQ[0]) newQ[0].progress = percent;
               return newQ;
             });
           }
@@ -127,26 +121,104 @@ function App() {
         // Success
         setUploadQueue(prev => {
           const newQ = [...prev];
-          newQ[i].status = 'success';
-          newQ[i].results = response.data.results;
-          newQ[i].progress = 100;
+          if (newQ[0]) {
+            newQ[0].status = 'success';
+            newQ[0].results = response.data.results;
+            newQ[0].progress = 100;
+          }
           return newQ;
         });
 
       } catch (err) {
         if (axios.isCancel(err)) {
           console.log('Upload cancelled');
-          // If cancelled, stop loop
-          break;
+        } else {
+          console.error(`[DEBUG] Error uploading merged video:`, err);
+          setUploadQueue(prev => {
+            const newQ = [...prev];
+            if (newQ[0]) {
+              newQ[0].status = 'error';
+              newQ[0].errorMsg = err.response?.data?.detail || err.message;
+            }
+            return newQ;
+          });
         }
-        console.error(`[DEBUG] Error uploading ${queueItem.file.name}:`, err);
+      }
+
+    } else {
+      // --- EXISTING SEQUENTIAL LOGIC ---
+      // Initialize Queue
+      const initialQueue = files.map(f => ({
+        file: f,
+        status: 'pending',
+        progress: 0,
+        results: null,
+        errorMsg: ''
+      }));
+      setUploadQueue(initialQueue);
+      setCurrentFileIndex(0);
+
+      // Iterate sequentially
+      for (let i = 0; i < initialQueue.length; i++) {
+        const queueItem = initialQueue[i];
+        setCurrentFileIndex(i);
+
+        // Update status to uploading
         setUploadQueue(prev => {
           const newQ = [...prev];
-          newQ[i].status = 'error';
-          newQ[i].errorMsg = err.response?.data?.detail || err.message;
+          newQ[i].status = 'uploading';
           return newQ;
         });
-        // Continue to next file even if one fails? Yes, usually better UX.
+
+        abortControllerRef.current = new AbortController();
+
+        const formData = new FormData();
+        formData.append('file', queueItem.file); // Backend supports 'file' for single uploads too
+        // Use global title if only 1 file, else let backend determine or use filename
+        formData.append('title', files.length === 1 ? title : '');
+        formData.append('description', description);
+        formData.append('hashtags', hashtags);
+        // merge is false by default
+
+        try {
+          console.log(`[DEBUG] Starting upload for ${queueItem.file.name}`);
+          const response = await axios.post(`${baseUrl}/api/upload`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+            signal: abortControllerRef.current.signal,
+            onUploadProgress: (progressEvent) => {
+              const percent = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+              setUploadQueue(prev => {
+                const newQ = [...prev];
+                newQ[i].progress = percent;
+                return newQ;
+              });
+            }
+          });
+
+          // Success
+          setUploadQueue(prev => {
+            const newQ = [...prev];
+            newQ[i].status = 'success';
+            newQ[i].results = response.data.results;
+            newQ[i].progress = 100;
+            return newQ;
+          });
+
+        } catch (err) {
+          if (axios.isCancel(err)) {
+            console.log('Upload cancelled');
+            // If cancelled, stop loop
+            break;
+          }
+          console.error(`[DEBUG] Error uploading ${queueItem.file.name}:`, err);
+          setUploadQueue(prev => {
+            const newQ = [...prev];
+            newQ[i].status = 'error';
+            newQ[i].errorMsg = err.response?.data?.detail || err.message;
+            return newQ;
+          });
+          // Continue to next file even if one fails? Yes.
+        }
       }
     }
 
@@ -273,6 +345,21 @@ function App() {
                     </button>
                   </div>
                 ))}
+
+                {files.length > 1 && (
+                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px', padding: '0.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '6px' }}>
+                    <input
+                      type="checkbox"
+                      id="mergeCheck"
+                      checked={mergeVideos}
+                      onChange={(e) => setMergeVideos(e.target.checked)}
+                      style={{ width: '16px', height: '16px', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                    />
+                    <label htmlFor="mergeCheck" style={{ color: 'white', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '500' }}>
+                      Merge these <strong>{files.length}</strong> videos into one?
+                    </label>
+                  </div>
+                )}
               </div>
             )}
           </div>
