@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2 } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -55,6 +55,19 @@ function App() {
 
   const removeFile = (index) => {
     setFiles(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const moveFile = (index, direction) => {
+    setFiles(prev => {
+      const newFiles = [...prev];
+      const targetIndex = index + direction;
+      // Safety check
+      if (targetIndex < 0 || targetIndex >= newFiles.length) return prev;
+
+      // Swap
+      [newFiles[index], newFiles[targetIndex]] = [newFiles[targetIndex], newFiles[index]];
+      return newFiles;
+    });
   };
 
   const handleCancelUpload = () => {
@@ -331,18 +344,67 @@ function App() {
                 {files.map((f, i) => (
                   <div key={i} className="file-info" style={{ justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <span style={{
+                        background: '#334155',
+                        color: 'white',
+                        width: '20px',
+                        height: '20px',
+                        borderRadius: '50%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        fontSize: '0.75rem',
+                        fontWeight: 'bold'
+                      }}>
+                        {i + 1}
+                      </span>
                       <FileVideo size={18} />
                       <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
                         {f.name}
                       </span>
                     </div>
-                    <button
-                      type="button"
-                      onClick={() => removeFile(i)}
-                      style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px' }}
-                    >
-                      <Trash2 size={16} />
-                    </button>
+
+                    <div style={{ display: 'flex', gap: '4px' }}>
+                      {/* Reordering Controls */}
+                      {files.length > 1 && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => moveFile(i, -1)}
+                            disabled={i === 0}
+                            style={{
+                              background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer',
+                              color: i === 0 ? '#475569' : '#94a3b8', padding: '4px'
+                            }}
+                            title="Move Up"
+                          >
+                            <ArrowUp size={16} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveFile(i, 1)}
+                            disabled={i === files.length - 1}
+                            style={{
+                              background: 'none', border: 'none', cursor: i === files.length - 1 ? 'default' : 'pointer',
+                              color: i === files.length - 1 ? '#475569' : '#94a3b8', padding: '4px'
+                            }}
+                            title="Move Down"
+                          >
+                            <ArrowDown size={16} />
+                          </button>
+                          <div style={{ width: '1px', background: '#334155', margin: '0 4px' }}></div>
+                        </>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => removeFile(i)}
+                        style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px' }}
+                        title="Remove"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </div>
                 ))}
 
