@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 def merge_videos(video_paths, output_dir):
     """
     Merges multiple video files into a single video file using FFmpeg.
+    Handles modification of input streams to ensure every segment has video+audio
+    before concatenation to prevent errors with silent clips.
     """
     if not video_paths:
         raise ValueError("No video paths provided for merging")
@@ -18,23 +20,50 @@ def merge_videos(video_paths, output_dir):
     logger.info(f"Merging {len(video_paths)} videos into {output_path}")
 
     try:
-        # Create input streams
-        inputs = [ffmpeg.input(path) for path in video_paths]
+        streams_to_concat = []
         
-        # Determine if we should use unsafe standard concat or complex filter
-        # Complex filter is safer against diff resolutions/formats
-        # stream = ffmpeg.concat(*inputs, v=1, a=1)
-        
-        # NOTE: If some videos differ in audio streams (none vs some), basic concat fails.
-        # But for 'standard' usage, we assume uniformity. 
-        # Robust method:
-        # ffmpeg.concat(*inputs, v=1, a=1).output(output_path).run()
-        
-        # Let's try the safer re-encoding approach
+        for path in video_paths:
+            # 1. Probe the file to check for audio streams
+            try:
+                probe = ffmpeg.probe(path)
+                video_stream_info = next((s for s in probe['streams'] if s['codec_type'] == 'video'), None)
+                audio_stream_info = next((s for s in probe['streams'] if s['codec_type'] == 'audio'), None)
+                
+                if not video_stream_info:
+                    logger.warning(f"File {path} has no video stream. Skipping.")
+                    continue
+
+                duration = float(video_stream_info.get('duration', probe['format']['duration']))
+                
+                # Input node
+                inp = ffmpeg.input(path)
+                
+                v_stream = inp['v']
+                
+                if audio_stream_info:
+                    a_stream = inp['a']
+                else:
+                    # Create silent audio match for video duration
+                    logger.info(f"Adding silent audio to {path} (Duration: {duration}s)")
+                    a_stream = ffmpeg.input('anullsrc', f='lavfi', t=duration).audio
+
+                streams_to_concat.append(v_stream)
+                streams_to_concat.append(a_stream)
+                
+            except Exception as probe_err:
+                logger.error(f"Failed to probe {path}: {probe_err}")
+                raise RuntimeError(f"Could not analyze video file: {os.path.basename(path)}")
+
+        if not streams_to_concat:
+            raise RuntimeError("No valid video streams found to merge.")
+
+        # 2. Concat
+        # We pass pairs of (v, a) for each input. Total inputs = len(streams_to_concat)/2
+        # v=1, a=1 means we want 1 combined video and 1 combined audio track output.
         (
             ffmpeg
-            .concat(*inputs, v=1, a=1)
-            .output(output_path, vcodec='libx264', acodec='aac')
+            .concat(*streams_to_concat, v=1, a=1)
+            .output(output_path, vcodec='libx264', acodec='aac', pix_fmt='yuv420p', shortest=None)
             .overwrite_output()
             .run(capture_stdout=True, capture_stderr=True)
         )
@@ -42,5 +71,6 @@ def merge_videos(video_paths, output_dir):
         return output_path
 
     except ffmpeg.Error as e:
-        logger.error(f"FFmpeg Error: {e.stderr.decode('utf8')}")
-        raise RuntimeError("Video merging failed. Ensure files are valid video formats.")
+        error_msg = e.stderr.decode('utf8') if e.stderr else str(e)
+        logger.error(f"FFmpeg Error: {error_msg}")
+        raise RuntimeError(f"Video merging failed: {error_msg}")
