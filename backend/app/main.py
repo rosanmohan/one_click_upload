@@ -7,7 +7,7 @@ import uuid
 import logging
 import sys
 
-from app.config import settings
+from app.config import get_settings
 from app.services.youtube_service import upload_to_youtube
 from app.services.facebook_service import upload_to_facebook
 from app.services.instagram_service import upload_to_instagram
