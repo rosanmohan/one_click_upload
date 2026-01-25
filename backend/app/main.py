@@ -48,9 +48,14 @@ async def upload_video(
     description: str = Form(""),
     hashtags: str = Form(""),
     title: str = Form(None),
-    merge: bool = Form(False)
+    merge: bool = Form(False),
+    profile_id: str = Form("kids_fun") # Default to existing profile
 ):
     print(f"--- [START] NEW UPLOAD REQUEST ---", flush=True)
+    
+    # Load Profile Settings
+    current_config = get_settings(profile_id)
+    logger.info(f"Using Profile: {profile_id.upper()}")
     
     # 1. Resolve Input Files
     input_files = []
@@ -64,7 +69,7 @@ async def upload_video(
         
     logger.info(f"Received {len(input_files)} files. Merge mode: {merge}")
 
-    if not settings.ALLOW_UPLOAD:
+    if not current_config.ALLOW_UPLOAD:
         logger.warning("Uploads are globally disabled (ALLOW_UPLOAD=false)")
         return {"results": [{"platform": "all", "status": "skipped", "message": "Uploads disabled globally"}]}
 
@@ -122,16 +127,16 @@ async def upload_video(
     video_title = title if title else (description.split('\n')[0][:100] if description else "Untitled Video")
     
     # Prepare public URL for Instagram
-    video_url = f"{settings.BASE_URL}/static/{filename}"
+    video_url = f"{current_config.BASE_URL}/static/{filename}"
     logger.info(f"Generated Public URL: {video_url}")
     
     results = []
     
     # 1. YouTube
-    if settings.UPLOAD_YOUTUBE:
-        logger.info("[YOUTUBE] Starting upload...")
+    if current_config.UPLOAD_YOUTUBE:
+        logger.info(f"[YOUTUBE] Starting upload for {profile_id}...")
         try:
-            yt_res = upload_to_youtube(final_file_path, video_title, full_description, list(filter(None, hashtags.split())))
+            yt_res = upload_to_youtube(final_file_path, video_title, full_description, list(filter(None, hashtags.split())), config=current_config)
             logger.info(f"[YOUTUBE] Result: {yt_res}")
             results.append(yt_res)
         except Exception as e:
@@ -142,10 +147,10 @@ async def upload_video(
         results.append({"platform": "youtube", "status": "skipped"})
     
     # 2. Facebook
-    if settings.UPLOAD_FACEBOOK:
-        logger.info("[FACEBOOK] Starting upload...")
+    if current_config.UPLOAD_FACEBOOK:
+        logger.info(f"[FACEBOOK] Starting upload for {profile_id}...")
         try:
-            fb_res = upload_to_facebook(final_file_path, full_description, video_title)
+            fb_res = upload_to_facebook(final_file_path, full_description, video_title, config=current_config)
             logger.info(f"[FACEBOOK] Result: {fb_res}")
             results.append(fb_res)
         except Exception as e:
@@ -156,22 +161,22 @@ async def upload_video(
         results.append({"platform": "facebook", "status": "skipped"})
     
     # 3. Instagram
-    if settings.UPLOAD_INSTAGRAM:
-        logger.info("[INSTAGRAM] Starting upload...")
+    if current_config.UPLOAD_INSTAGRAM:
+        logger.info(f"[INSTAGRAM] Starting upload for {profile_id}...")
         try:
             # Try Cloudinary first if credentials exist
             cloudinary_data = None
-            if settings.CLOUDINARY_CLOUD_NAME:
+            if current_config.CLOUDINARY_CLOUD_NAME:
                 from app.services.cloudinary_service import upload_video_to_cloudinary, delete_video_from_cloudinary
                 logger.info("[INSTAGRAM] Uploading to Cloudinary for valid URL...")
-                cloudinary_data = upload_video_to_cloudinary(final_file_path)
+                cloudinary_data = upload_video_to_cloudinary(final_file_path) # Cloudinary service might need config too if creds change per profile. Assuming global for now.
                 logger.info(f"[INSTAGRAM] Cloudinary uploaded: {cloudinary_data}")
                 
                 if cloudinary_data and cloudinary_data.get("url"):
                     # Use Cloudinary URL
                     ig_url = cloudinary_data.get("url")
                     logger.info(f"[INSTAGRAM] Using Cloudinary URL: {ig_url}")
-                    ig_res = upload_to_instagram(ig_url, full_description)
+                    ig_res = upload_to_instagram(ig_url, full_description, config=current_config)
                     logger.info(f"[INSTAGRAM] Upload Result: {ig_res}")
                     
                     # Clean up Cloudinary
@@ -180,10 +185,15 @@ async def upload_video(
                 else:
                     # Fallback to local URL
                     logger.warning("[INSTAGRAM] Cloudinary failed or not configured. Using local URL.")
-                    ig_res = upload_to_instagram(video_url, full_description)
+                    ig_res = upload_to_instagram(video_url, full_description, config=current_config)
                     logger.info(f"[INSTAGRAM] Upload Result: {ig_res}")
                     
                 results.append(ig_res)
+            else:
+                 # No Cloudinary, direct upload
+                 ig_res = upload_to_instagram(video_url, full_description, config=current_config)
+                 results.append(ig_res)
+                 
         except Exception as e:
             logger.error(f"[INSTAGRAM] Critical Failure: {e}", exc_info=True)
             results.append({"status": "error", "platform": "instagram", "message": str(e)})

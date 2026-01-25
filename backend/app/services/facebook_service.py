@@ -2,17 +2,17 @@ import requests
 import os
 from app.config import settings
 
-def upload_to_facebook(file_path, description, title=None):
-    if not settings.UPLOAD_FACEBOOK:
+def upload_to_facebook(file_path, description, title=None, config=settings):
+    if not config.UPLOAD_FACEBOOK:
         return {"status": "skipped", "platform": "facebook"}
 
-    if not settings.FACEBOOK_PAGE_ID or not settings.FACEBOOK_ACCESS_TOKEN:
+    if not config.FACEBOOK_PAGE_ID or not config.FACEBOOK_ACCESS_TOKEN:
          return {"status": "error", "platform": "facebook", "message": "Missing Page ID or Access Token"}
 
-    url = f"https://graph-video.facebook.com/v18.0/{settings.FACEBOOK_PAGE_ID}/videos"
+    url = f"https://graph-video.facebook.com/v18.0/{config.FACEBOOK_PAGE_ID}/videos"
     
     payload = {
-        'access_token': settings.FACEBOOK_ACCESS_TOKEN,
+        'access_token': config.FACEBOOK_ACCESS_TOKEN,
         'description': description,
         'title': title or description[:50]
     }

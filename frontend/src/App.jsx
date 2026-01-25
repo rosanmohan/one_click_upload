@@ -1,6 +1,6 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2, ArrowUp, ArrowDown } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2, ArrowUp, ArrowDown, User } from 'lucide-react';
 import './App.css';
 
 function App() {
@@ -15,6 +15,7 @@ function App() {
   const [showModal, setShowModal] = useState(false);
 
   const [mergeVideos, setMergeVideos] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState('kids_fun'); // Default profile
 
   // currentFileIndex tracks which file is currently being processed in the loop
   const [currentFileIndex, setCurrentFileIndex] = useState(-1);
@@ -115,6 +116,7 @@ function App() {
       formData.append('description', description);
       formData.append('hashtags', hashtags);
       formData.append('merge', 'true');
+      formData.append('profile_id', selectedProfile);
 
       try {
         console.log(`[DEBUG] Starting merged upload for ${files.length} files`);
@@ -191,6 +193,7 @@ function App() {
         formData.append('title', files.length === 1 ? title : '');
         formData.append('description', description);
         formData.append('hashtags', hashtags);
+        formData.append('profile_id', selectedProfile);
         // merge is false by default
 
         try {
@@ -315,6 +318,51 @@ function App() {
         )}
 
         <form onSubmit={handleSubmit} style={{ opacity: serverStatus === 'active' ? 1 : 0.5, pointerEvents: serverStatus === 'active' ? 'auto' : 'none', transition: 'opacity 0.3s' }}>
+
+          {/* Profile Selection */}
+          <div className="form-group">
+            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <User size={18} /> Select Profile
+            </label>
+            <div style={{ display: 'flex', gap: '1rem' }}>
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '0.75rem 1rem',
+                background: selectedProfile === 'kids_fun' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                border: selectedProfile === 'kids_fun' ? '1px solid #8b5cf6' : '1px solid transparent',
+                borderRadius: '8px', cursor: 'pointer', flex: 1, transition: 'all 0.2s'
+              }}>
+                <input
+                  type="radio"
+                  name="profile"
+                  value="kids_fun"
+                  checked={selectedProfile === 'kids_fun'}
+                  onChange={(e) => setSelectedProfile(e.target.value)}
+                  style={{ accentColor: '#8b5cf6' }}
+                />
+                <span style={{ fontWeight: '500' }}>Kids Fun</span>
+              </label>
+
+              <label style={{
+                display: 'flex', alignItems: 'center', gap: '8px',
+                padding: '0.75rem 1rem',
+                background: selectedProfile === 'ayesha' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                border: selectedProfile === 'ayesha' ? '1px solid #8b5cf6' : '1px solid transparent',
+                borderRadius: '8px', cursor: 'pointer', flex: 1, transition: 'all 0.2s'
+              }}>
+                <input
+                  type="radio"
+                  name="profile"
+                  value="ayesha"
+                  checked={selectedProfile === 'ayesha'}
+                  onChange={(e) => setSelectedProfile(e.target.value)}
+                  style={{ accentColor: '#8b5cf6' }}
+                />
+                <span style={{ fontWeight: '500' }}>Ayesha</span>
+              </label>
+            </div>
+          </div>
+
           {/* File Upload */}
           <div className="form-group">
             <label className="form-label">Video Files</label>

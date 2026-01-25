@@ -2,17 +2,17 @@ import requests
 import time
 from app.config import settings
 
-def upload_to_instagram(video_url, caption):
-    if not settings.UPLOAD_INSTAGRAM:
+def upload_to_instagram(video_url, caption, config=settings):
+    if not config.UPLOAD_INSTAGRAM:
         return {"status": "skipped", "platform": "instagram"}
     
-    if not settings.INSTAGRAM_ACCOUNT_ID or not settings.FACEBOOK_ACCESS_TOKEN:
+    if not config.INSTAGRAM_ACCOUNT_ID or not config.FACEBOOK_ACCESS_TOKEN:
          return {"status": "error", "platform": "instagram", "message": "Missing Account ID or Access Token"}
 
     # Step 1: Create Container
-    url = f"https://graph.facebook.com/v18.0/{settings.INSTAGRAM_ACCOUNT_ID}/media"
+    url = f"https://graph.facebook.com/v18.0/{config.INSTAGRAM_ACCOUNT_ID}/media"
     payload = {
-        'access_token': settings.FACEBOOK_ACCESS_TOKEN, 
+        'access_token': config.FACEBOOK_ACCESS_TOKEN, 
         'media_type': 'REELS',
         'video_url': video_url,
         'caption': caption
@@ -33,7 +33,7 @@ def upload_to_instagram(video_url, caption):
         # Step 2: Wait for processing
         status_url = f"https://graph.facebook.com/v18.0/{container_id}"
         params = {
-            'access_token': settings.FACEBOOK_ACCESS_TOKEN,
+            'access_token': config.FACEBOOK_ACCESS_TOKEN,
             'fields': 'status_code'
         }
         
@@ -54,9 +54,9 @@ def upload_to_instagram(video_url, caption):
             
         # Step 3: Publish
         print("Publishing to Instagram...")
-        publish_url = f"https://graph.facebook.com/v18.0/{settings.INSTAGRAM_ACCOUNT_ID}/media_publish"
+        publish_url = f"https://graph.facebook.com/v18.0/{config.INSTAGRAM_ACCOUNT_ID}/media_publish"
         pub_payload = {
-            'access_token': settings.FACEBOOK_ACCESS_TOKEN,
+            'access_token': config.FACEBOOK_ACCESS_TOKEN,
             'creation_id': container_id
         }
         pub_res = requests.post(publish_url, data=pub_payload)
