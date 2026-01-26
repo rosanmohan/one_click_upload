@@ -53,9 +53,22 @@ async def upload_video(
 ):
     print(f"--- [START] NEW UPLOAD REQUEST ---", flush=True)
     
+    # Validate profile_id
+    valid_profiles = ["kids_fun", "ayesha"]
+    if profile_id not in valid_profiles:
+        logger.error(f"Invalid profile_id: {profile_id}. Must be one of {valid_profiles}")
+        raise HTTPException(status_code=400, detail=f"Invalid profile. Must be one of: {valid_profiles}")
+    
     # Load Profile Settings
     current_config = get_settings(profile_id)
+    logger.info(f"========================================")
     logger.info(f"Using Profile: {profile_id.upper()}")
+    logger.info(f"Profile Name: {current_config.profile_info['name']}")
+    logger.info(f"Content Rating: {current_config.profile_info['content_rating']}")
+    logger.info(f"Made for Kids: {current_config.profile_info['made_for_kids']}")
+    if current_config.profile_info['age_restriction']:
+        logger.info(f"Age Restriction: {current_config.profile_info['age_restriction']}+")
+    logger.info(f"========================================")
     
     # 1. Resolve Input Files
     input_files = []

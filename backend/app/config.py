@@ -9,6 +9,25 @@ class ProfileSettings:
         self.profile_id = profile_id
         self.profile_dir = os.path.join(os.getcwd(), "profiles", profile_id)
         
+        # Profile-specific metadata for content safety
+        self.PROFILE_METADATA = {
+            "kids_fun": {
+                "name": "Kids Fun",
+                "made_for_kids": True,
+                "age_restriction": None,
+                "content_rating": "family_friendly"
+            },
+            "ayesha": {
+                "name": "Ayesha",
+                "made_for_kids": False,
+                "age_restriction": 18,
+                "content_rating": "adult"
+            }
+        }
+        
+        # Get current profile's metadata
+        self.profile_info = self.PROFILE_METADATA.get(profile_id, self.PROFILE_METADATA["kids_fun"])
+        
         # Ensure dir exists (or fallback to root for default)
         if not os.path.exists(self.profile_dir) and profile_id == "kids_fun":
             # Fallback for migration: use root if profile folder empty/missing

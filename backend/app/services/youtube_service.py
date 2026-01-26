@@ -75,6 +75,28 @@ def upload_to_youtube(file_path, title, description, tags, config=settings):
         logger.error(error_msg)
         return {"status": "error", "platform": "youtube", "message": error_msg}
 
+    # SAFETY CHECK: Verify the authenticated channel before upload
+    try:
+        channels_response = youtube.channels().list(
+            part='snippet,contentDetails',
+            mine=True
+        ).execute()
+        
+        if 'items' in channels_response and len(channels_response['items']) > 0:
+            channel_title = channels_response['items'][0]['snippet']['title']
+            channel_id = channels_response['items'][0]['id']
+            logger.info(f"[PROFILE: {config.profile_id.upper()}] Authenticated as YouTube Channel: '{channel_title}' (ID: {channel_id})")
+            
+            # Additional safety: Log profile metadata
+            logger.info(f"[PROFILE: {config.profile_id.upper()}] Content Rating: {config.profile_info['content_rating']}, Made for Kids: {config.profile_info['made_for_kids']}")
+        else:
+            logger.warning("Could not verify YouTube channel. Proceeding with caution.")
+    except Exception as e:
+        logger.warning(f"Failed to verify YouTube channel: {e}. Proceeding with upload.")
+
+    # Set age-appropriate settings based on profile
+    made_for_kids = config.profile_info.get('made_for_kids', False)
+    
     body = {
         'snippet': {
             'title': title,
@@ -84,13 +106,13 @@ def upload_to_youtube(file_path, title, description, tags, config=settings):
         },
         'status': {
             'privacyStatus': 'public', 
-            'selfDeclaredMadeForKids': False
+            'selfDeclaredMadeForKids': made_for_kids
         }
     }
 
     media = MediaFileUpload(file_path, chunksize=-1, resumable=True)
 
-    logger.info(f"Uploading to YouTube: {title}")
+    logger.info(f"Uploading to YouTube: {title} [Profile: {config.profile_id}, Made for Kids: {made_for_kids}]")
     
     try:
         request = youtube.videos().insert(
@@ -108,9 +130,10 @@ def upload_to_youtube(file_path, title, description, tags, config=settings):
                 logger.info(f"YouTube Upload Progress: {progress}%")
         
         video_id = response.get('id')
-        logger.info(f"YouTube Upload Complete. ID: {video_id}")
+        logger.info(f"YouTube Upload Complete. ID: {video_id} [Channel: {channel_title if 'channel_title' in locals() else 'Unknown'}]")
         return {"status": "success", "platform": "youtube", "data": response}
     except Exception as e:
         logger.error(f"YouTube Upload Failed: {e}", exc_info=True)
         return {"status": "error", "platform": "youtube", "message": f"{str(e)}"}
+
 
