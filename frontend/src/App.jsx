@@ -549,7 +549,17 @@ function App() {
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
                     <span style={{ fontWeight: '500', fontSize: '0.9rem', color: 'white' }}>{item.file.name}</span>
                     <span style={{ fontSize: '0.8rem', opacity: 0.7, textTransform: 'capitalize' }}>
-                      {item.status === 'uploading' && item.progress === 100 ? 'Finishing...' : item.status}
+                      {item.status === 'uploading' && item.progress === 100 ? (
+                        <span className="finishing-text">
+                          Finishing
+                          <span className="finishing-dots">
+                            <span>.</span>
+                            <span>.</span>
+                            <span>.</span>
+                          </span>
+                          <span className="spinner"></span>
+                        </span>
+                      ) : item.status}
                     </span>
                   </div>
 
