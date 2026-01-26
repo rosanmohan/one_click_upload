@@ -49,12 +49,15 @@ def get_authenticated_service(config=settings):
                 # If neither exists, we can't upload
                 return None
         
-        # Save the credentials for the next run
+        # Save the credentials for the next run (if filesystem is writable)
         if creds:
             try:
                 with open(config.YOUTUBE_TOKEN_FILE, 'w') as token:
                     token.write(creds.to_json())
                 logger.info(f"Saved new YouTube credentials to {config.YOUTUBE_TOKEN_FILE}")
+            except (PermissionError, OSError) as e:
+                # Expected on Render with Secret Files (read-only filesystem)
+                logger.warning(f"Could not save token (read-only filesystem): {config.YOUTUBE_TOKEN_FILE}. Token refreshed in memory only.")
             except Exception as e:
                 logger.error(f"Failed to save credentials: {e}")
 
