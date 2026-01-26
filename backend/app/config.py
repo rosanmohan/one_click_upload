@@ -39,17 +39,37 @@ class ProfileSettings:
         # 3. Files (YouTube)
         # Priority: 
         #   1. Env Var specific to profile (KIDS_FUN_YOUTUBE_TOKEN_FILE)
-        #   2. File in profiles/{id}/youtube_token.json
-        #   3. Global Env Var (YOUTUBE_TOKEN_FILE) - fallback for default profile
+        #   2. Render Secret File: /etc/secrets/{profile_id}_youtube_token.json
+        #   3. Local File in profiles/{id}/youtube_token.json
+        #   4. Global Env Var (YOUTUBE_TOKEN_FILE) - fallback for default profile
         
+        # Check for Render Secret Files (flat naming)
+        render_token_path = f"/etc/secrets/{profile_id}_youtube_token.json"
+        render_secret_path = f"/etc/secrets/{profile_id}_client_secret.json"
+        
+        # Check for local profile directory files
         default_token_path = os.path.join(self.profile_dir, "youtube_token.json")
         default_secret_path = os.path.join(self.profile_dir, "client_secret.json")
 
-        self.YOUTUBE_TOKEN_FILE = os.getenv(f"{prefix}_YOUTUBE_TOKEN_FILE", 
-                                            default_token_path if os.path.exists(default_token_path) else os.getenv("YOUTUBE_TOKEN_FILE", "youtube_token.json"))
-                                            
-        self.YOUTUBE_CLIENT_SECRET_FILE = os.getenv(f"{prefix}_YOUTUBE_CLIENT_SECRET_FILE", 
-                                                    default_secret_path if os.path.exists(default_secret_path) else os.getenv("YOUTUBE_CLIENT_SECRET_FILE", "client_secret.json"))
+        # Resolve token file path
+        self.YOUTUBE_TOKEN_FILE = os.getenv(f"{prefix}_YOUTUBE_TOKEN_FILE")
+        if not self.YOUTUBE_TOKEN_FILE or not os.path.exists(self.YOUTUBE_TOKEN_FILE):
+            if os.path.exists(render_token_path):
+                self.YOUTUBE_TOKEN_FILE = render_token_path
+            elif os.path.exists(default_token_path):
+                self.YOUTUBE_TOKEN_FILE = default_token_path
+            else:
+                self.YOUTUBE_TOKEN_FILE = os.getenv("YOUTUBE_TOKEN_FILE", "youtube_token.json")
+        
+        # Resolve client secret file path
+        self.YOUTUBE_CLIENT_SECRET_FILE = os.getenv(f"{prefix}_YOUTUBE_CLIENT_SECRET_FILE")
+        if not self.YOUTUBE_CLIENT_SECRET_FILE or not os.path.exists(self.YOUTUBE_CLIENT_SECRET_FILE):
+            if os.path.exists(render_secret_path):
+                self.YOUTUBE_CLIENT_SECRET_FILE = render_secret_path
+            elif os.path.exists(default_secret_path):
+                self.YOUTUBE_CLIENT_SECRET_FILE = default_secret_path
+            else:
+                self.YOUTUBE_CLIENT_SECRET_FILE = os.getenv("YOUTUBE_CLIENT_SECRET_FILE", "client_secret.json")
 
 def get_settings(profile_id: str = "kids_fun"):
     return ProfileSettings(profile_id)
