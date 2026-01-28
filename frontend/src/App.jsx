@@ -1,7 +1,8 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
-import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2, ArrowUp, ArrowDown, User } from 'lucide-react';
+import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2, ArrowUp, ArrowDown, User, Calendar } from 'lucide-react';
 import './App.css';
+import ScheduledUploads from './ScheduledUploads';
 
 function App() {
   const [files, setFiles] = useState([]);
@@ -17,12 +18,17 @@ function App() {
   const [mergeVideos, setMergeVideos] = useState(false);
   const [selectedProfile, setSelectedProfile] = useState('kids_fun'); // Default profile
 
+  // Scheduling feature
+  const [isScheduled, setIsScheduled] = useState(false);
+  const [scheduledDateTime, setScheduledDateTime] = useState('');
+  const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'scheduled'
+
   // currentFileIndex tracks which file is currently being processed in the loop
   const [currentFileIndex, setCurrentFileIndex] = useState(-1);
   const abortControllerRef = useRef(null);
 
   // Helper to get Base URL
-  const getBaseUrl = () => import.meta.env.VITE_API_URL || 'http://192.168.1.3:8000';
+  const getBaseUrl = () => import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
   const activateServer = async () => {
     setServerStatus('activating');
@@ -79,6 +85,77 @@ function App() {
     setShowModal(false);
     setCurrentFileIndex(-1);
     setUploadQueue([]);
+  };
+
+  const handleScheduledUpload = async (e) => {
+    e.preventDefault();
+
+    // Validation
+    if (files.length === 0) {
+      setError("Please select at least one video file.");
+      return;
+    }
+    if (!title.trim()) {
+      setError("Please provide a title for the scheduled upload.");
+      return;
+    }
+    if (!scheduledDateTime) {
+      setError("Please select a date and time for the upload.");
+      return;
+    }
+
+    setError('');
+    setLoading(true);
+
+    const baseUrl = getBaseUrl();
+    const formData = new FormData();
+
+    // For scheduled uploads, only allow single file (no merge for scheduled)
+    if (files.length > 1) {
+      setError("Scheduled uploads currently support only one video file.");
+      setLoading(false);
+      return;
+    }
+
+    formData.append('file', files[0]);
+    formData.append('title', title);
+    formData.append('description', description);
+    formData.append('hashtags', hashtags);
+    formData.append('scheduled_time', scheduledDateTime);
+    formData.append('profile_id', selectedProfile);
+    formData.append('upload_youtube', 'true');
+    formData.append('upload_facebook', 'true');
+    formData.append('upload_instagram', 'true');
+
+    try {
+      const response = await axios.post(
+        `${baseUrl}/api/scheduled/upload`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' }
+        }
+      );
+
+      if (response.data.success) {
+        alert(`✅ Upload scheduled successfully for ${new Date(scheduledDateTime).toLocaleString()}!`);
+
+        // Reset form
+        setFiles([]);
+        setTitle('');
+        setDescription('');
+        setHashtags('');
+        setScheduledDateTime('');
+        setIsScheduled(false);
+
+        // Switch to scheduled view
+        setCurrentView('scheduled');
+      }
+    } catch (error) {
+      const errorMessage = error.response?.data?.detail || error.message;
+      setError(`Failed to schedule upload: ${errorMessage}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -246,8 +323,56 @@ function App() {
     <div className="app-container">
       <div className="glass-card">
         <header className="header">
-          <h1>Social Blast</h1>
-          <p>Upload once, publish everywhere.</p>
+          <div>
+            <h1>Social Blast</h1>
+            <p>Upload once, publish everywhere.</p>
+          </div>
+
+          {/* View Toggle */}
+          <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
+            <button
+              type="button"
+              onClick={() => setCurrentView('upload')}
+              className={`view-toggle-btn ${currentView === 'upload' ? 'active' : ''}`}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentView === 'upload' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontWeight: '500',
+                transition: 'all 0.3s'
+              }}
+            >
+              <Upload size={16} />
+              Upload
+            </button>
+            <button
+              type="button"
+              onClick={() => setCurrentView('scheduled')}
+              className={`view-toggle-btn ${currentView === 'scheduled' ? 'active' : ''}`}
+              style={{
+                padding: '0.5rem 1rem',
+                borderRadius: '8px',
+                border: 'none',
+                background: currentView === 'scheduled' ? 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' : 'rgba(255, 255, 255, 0.1)',
+                color: 'white',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '0.5rem',
+                fontWeight: '500',
+                transition: 'all 0.3s'
+              }}
+            >
+              <Calendar size={16} />
+              Scheduled
+            </button>
+          </div>
         </header>
 
         {/* Server Activation Section */}
@@ -317,212 +442,286 @@ function App() {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} style={{ opacity: serverStatus === 'active' ? 1 : 0.5, pointerEvents: serverStatus === 'active' ? 'auto' : 'none', transition: 'opacity 0.3s' }}>
+        {/* Upload View */}
+        {currentView === 'upload' && (
+          <form onSubmit={handleSubmit} style={{ opacity: serverStatus === 'active' ? 1 : 0.5, pointerEvents: serverStatus === 'active' ? 'auto' : 'none', transition: 'opacity 0.3s' }}>
 
-          {/* Profile Selection */}
-          <div className="form-group">
-            <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <User size={18} /> Select Profile
-            </label>
-            <div style={{ display: 'flex', gap: '1rem' }}>
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '0.75rem 1rem',
-                background: selectedProfile === 'kids_fun' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                border: selectedProfile === 'kids_fun' ? '1px solid #8b5cf6' : '1px solid transparent',
-                borderRadius: '8px', cursor: 'pointer', flex: 1, transition: 'all 0.2s'
-              }}>
-                <input
-                  type="radio"
-                  name="profile"
-                  value="kids_fun"
-                  checked={selectedProfile === 'kids_fun'}
-                  onChange={(e) => setSelectedProfile(e.target.value)}
-                  style={{ accentColor: '#8b5cf6' }}
-                />
-                <span style={{ fontWeight: '500' }}>Kids Fun</span>
+            {/* Profile Selection */}
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <User size={18} /> Select Profile
               </label>
+              <div style={{ display: 'flex', gap: '1rem' }}>
+                <label style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '0.75rem 1rem',
+                  background: selectedProfile === 'kids_fun' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: selectedProfile === 'kids_fun' ? '1px solid #8b5cf6' : '1px solid transparent',
+                  borderRadius: '8px', cursor: 'pointer', flex: 1, transition: 'all 0.2s'
+                }}>
+                  <input
+                    type="radio"
+                    name="profile"
+                    value="kids_fun"
+                    checked={selectedProfile === 'kids_fun'}
+                    onChange={(e) => setSelectedProfile(e.target.value)}
+                    style={{ accentColor: '#8b5cf6' }}
+                  />
+                  <span style={{ fontWeight: '500' }}>Kids Fun</span>
+                </label>
 
-              <label style={{
-                display: 'flex', alignItems: 'center', gap: '8px',
-                padding: '0.75rem 1rem',
-                background: selectedProfile === 'ayesha' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
-                border: selectedProfile === 'ayesha' ? '1px solid #8b5cf6' : '1px solid transparent',
-                borderRadius: '8px', cursor: 'pointer', flex: 1, transition: 'all 0.2s'
-              }}>
-                <input
-                  type="radio"
-                  name="profile"
-                  value="ayesha"
-                  checked={selectedProfile === 'ayesha'}
-                  onChange={(e) => setSelectedProfile(e.target.value)}
-                  style={{ accentColor: '#8b5cf6' }}
-                />
-                <span style={{ fontWeight: '500' }}>Ayesha</span>
-              </label>
-            </div>
-          </div>
-
-          {/* File Upload */}
-          <div className="form-group">
-            <label className="form-label">Video Files</label>
-            <div
-              className="file-upload-zone"
-              onDrop={handleDrop}
-              onDragOver={(e) => e.preventDefault()}
-              onClick={() => document.getElementById('fileInput').click()}
-            >
-              <input
-                type="file"
-                id="fileInput"
-                className="file-input"
-                accept="video/*"
-                multiple
-                onChange={handleFileChange}
-              />
-              <Upload className="upload-icon" />
-              <p style={{ margin: 0, color: '#94a3b8' }}>
-                Click to add videos or drag them here
-              </p>
-            </div>
-
-            {/* File List */}
-            {files.length > 0 && (
-              <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {files.map((f, i) => (
-                  <div key={i} className="file-info" style={{ justifyContent: 'space-between' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <span style={{
-                        background: '#334155',
-                        color: 'white',
-                        width: '20px',
-                        height: '20px',
-                        borderRadius: '50%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: '0.75rem',
-                        fontWeight: 'bold'
-                      }}>
-                        {i + 1}
-                      </span>
-                      <FileVideo size={18} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
-                        {f.name}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '4px' }}>
-                      {/* Reordering Controls */}
-                      {files.length > 1 && (
-                        <>
-                          <button
-                            type="button"
-                            onClick={() => moveFile(i, -1)}
-                            disabled={i === 0}
-                            style={{
-                              background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer',
-                              color: i === 0 ? '#475569' : '#94a3b8', padding: '4px'
-                            }}
-                            title="Move Up"
-                          >
-                            <ArrowUp size={16} />
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => moveFile(i, 1)}
-                            disabled={i === files.length - 1}
-                            style={{
-                              background: 'none', border: 'none', cursor: i === files.length - 1 ? 'default' : 'pointer',
-                              color: i === files.length - 1 ? '#475569' : '#94a3b8', padding: '4px'
-                            }}
-                            title="Move Down"
-                          >
-                            <ArrowDown size={16} />
-                          </button>
-                          <div style={{ width: '1px', background: '#334155', margin: '0 4px' }}></div>
-                        </>
-                      )}
-
-                      <button
-                        type="button"
-                        onClick={() => removeFile(i)}
-                        style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px' }}
-                        title="Remove"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-
-                {files.length > 1 && (
-                  <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px', padding: '0.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '6px' }}>
-                    <input
-                      type="checkbox"
-                      id="mergeCheck"
-                      checked={mergeVideos}
-                      onChange={(e) => setMergeVideos(e.target.checked)}
-                      style={{ width: '16px', height: '16px', accentColor: '#8b5cf6', cursor: 'pointer' }}
-                    />
-                    <label htmlFor="mergeCheck" style={{ color: 'white', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '500' }}>
-                      Merge these <strong>{files.length}</strong> videos into one?
-                    </label>
-                  </div>
-                )}
+                <label style={{
+                  display: 'flex', alignItems: 'center', gap: '8px',
+                  padding: '0.75rem 1rem',
+                  background: selectedProfile === 'ayesha' ? 'rgba(139, 92, 246, 0.2)' : 'rgba(255, 255, 255, 0.05)',
+                  border: selectedProfile === 'ayesha' ? '1px solid #8b5cf6' : '1px solid transparent',
+                  borderRadius: '8px', cursor: 'pointer', flex: 1, transition: 'all 0.2s'
+                }}>
+                  <input
+                    type="radio"
+                    name="profile"
+                    value="ayesha"
+                    checked={selectedProfile === 'ayesha'}
+                    onChange={(e) => setSelectedProfile(e.target.value)}
+                    style={{ accentColor: '#8b5cf6' }}
+                  />
+                  <span style={{ fontWeight: '500' }}>Ayesha</span>
+                </label>
               </div>
-            )}
-          </div>
+            </div>
 
-          <div className="form-group">
-            <label className="form-label">Title (Optional)</label>
-            <input
-              type="text"
-              className="form-input"
-              placeholder={files.length > 1 ? "Ignored for multiple files (filenames will be used)" : "Amazing Video Title"}
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              disabled={files.length > 1}
-            />
-          </div>
+            {/* File Upload */}
+            <div className="form-group">
+              <label className="form-label">Video Files</label>
+              <div
+                className="file-upload-zone"
+                onDrop={handleDrop}
+                onDragOver={(e) => e.preventDefault()}
+                onClick={() => document.getElementById('fileInput').click()}
+              >
+                <input
+                  type="file"
+                  id="fileInput"
+                  className="file-input"
+                  accept="video/*"
+                  multiple
+                  onChange={handleFileChange}
+                />
+                <Upload className="upload-icon" />
+                <p style={{ margin: 0, color: '#94a3b8' }}>
+                  Click to add videos or drag them here
+                </p>
+              </div>
 
-          <div className="form-group">
-            <label className="form-label">Description (for all videos)</label>
-            <textarea
-              className="form-textarea"
-              placeholder="What is this video about?"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-            />
-          </div>
+              {/* File List */}
+              {files.length > 0 && (
+                <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                  {files.map((f, i) => (
+                    <div key={i} className="file-info" style={{ justifyContent: 'space-between' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <span style={{
+                          background: '#334155',
+                          color: 'white',
+                          width: '20px',
+                          height: '20px',
+                          borderRadius: '50%',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: '0.75rem',
+                          fontWeight: 'bold'
+                        }}>
+                          {i + 1}
+                        </span>
+                        <FileVideo size={18} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                          {f.name}
+                        </span>
+                      </div>
 
-          <div className="form-group">
-            <label className="form-label">Hashtags (for all videos)</label>
-            <select
-              className="form-input"
-              value={hashtags}
-              onChange={(e) => setHashtags(e.target.value)}
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        {/* Reordering Controls */}
+                        {files.length > 1 && (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => moveFile(i, -1)}
+                              disabled={i === 0}
+                              style={{
+                                background: 'none', border: 'none', cursor: i === 0 ? 'default' : 'pointer',
+                                color: i === 0 ? '#475569' : '#94a3b8', padding: '4px'
+                              }}
+                              title="Move Up"
+                            >
+                              <ArrowUp size={16} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveFile(i, 1)}
+                              disabled={i === files.length - 1}
+                              style={{
+                                background: 'none', border: 'none', cursor: i === files.length - 1 ? 'default' : 'pointer',
+                                color: i === files.length - 1 ? '#475569' : '#94a3b8', padding: '4px'
+                              }}
+                              title="Move Down"
+                            >
+                              <ArrowDown size={16} />
+                            </button>
+                            <div style={{ width: '1px', background: '#334155', margin: '0 4px' }}></div>
+                          </>
+                        )}
+
+                        <button
+                          type="button"
+                          onClick={() => removeFile(i)}
+                          style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', padding: '4px' }}
+                          title="Remove"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {files.length > 1 && (
+                    <div style={{ marginTop: '0.5rem', display: 'flex', alignItems: 'center', gap: '8px', padding: '0.5rem', background: 'rgba(139, 92, 246, 0.1)', borderRadius: '6px' }}>
+                      <input
+                        type="checkbox"
+                        id="mergeCheck"
+                        checked={mergeVideos}
+                        onChange={(e) => setMergeVideos(e.target.checked)}
+                        style={{ width: '16px', height: '16px', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="mergeCheck" style={{ color: 'white', fontSize: '0.9rem', cursor: 'pointer', fontWeight: '500' }}>
+                        Merge these <strong>{files.length}</strong> videos into one?
+                      </label>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Title (Optional)</label>
+              <input
+                type="text"
+                className="form-input"
+                placeholder={files.length > 1 ? "Ignored for multiple files (filenames will be used)" : "Amazing Video Title"}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                disabled={files.length > 1}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Description (for all videos)</label>
+              <textarea
+                className="form-textarea"
+                placeholder="What is this video about?"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">Hashtags (for all videos)</label>
+              <select
+                className="form-input"
+                value={hashtags}
+                onChange={(e) => setHashtags(e.target.value)}
+              >
+                <option value="">-- Select Hashtags --</option>
+                <option value="#viral #trending #reels">Viral & Trending (#viral #trending #reels)</option>
+                <option value="#comedy #funny #lol">Comedy & Fun (#comedy #funny #lol)</option>
+                <option value="#tech #innovation #gadgets">Technology (#tech #innovation)</option>
+                <option value="#travel #wanderlust #adventure">Travel (#travel #wanderlust)</option>
+                <option value="#food #foodie #delicious">Food & Cooking (#food #foodie)</option>
+                <option value="#fitness #gym #workout">Fitness & Health (#fitness #gym)</option>
+                <option value="#music #song #dance">Music & Dance (#music #song)</option>
+                <option value="#motivation #inspiration #quotes">Motivation (#motivation #quotes)</option>
+                <option value="#nature #beautiful #earth">Nature (#nature #beautiful)</option>
+                <option value="#gaming #gamer #stream">Gaming (#gaming #gamer)</option>
+              </select>
+            </div>
+
+            {error && <p style={{ color: '#f87171', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</p>}
+
+            {/* Scheduling Toggle */}
+            <div className="form-group" style={{
+              background: 'rgba(139, 92, 246, 0.1)',
+              padding: '1rem',
+              borderRadius: '8px',
+              border: '1px solid rgba(139, 92, 246, 0.3)'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: isScheduled ? '1rem' : 0 }}>
+                <input
+                  type="checkbox"
+                  id="scheduleCheck"
+                  checked={isScheduled}
+                  onChange={(e) => {
+                    setIsScheduled(e.target.checked);
+                    if (!e.target.checked) setScheduledDateTime('');
+                  }}
+                  style={{ width: '18px', height: '18px', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                />
+                <label htmlFor="scheduleCheck" style={{
+                  color: 'white',
+                  fontSize: '1rem',
+                  cursor: 'pointer',
+                  fontWeight: '600',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem'
+                }}>
+                  <Calendar size={18} />
+                  Schedule for later?
+                </label>
+              </div>
+
+              {isScheduled && (
+                <div>
+                  <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                    Select Date & Time
+                  </label>
+                  <input
+                    type="datetime-local"
+                    className="form-input"
+                    value={scheduledDateTime}
+                    onChange={(e) => setScheduledDateTime(e.target.value)}
+                    min={new Date().toISOString().slice(0, 16)}
+                    required={isScheduled}
+                    style={{
+                      padding: '0.75rem',
+                      fontSize: '1rem',
+                      background: 'rgba(255, 255, 255, 0.05)',
+                      border: '1px solid rgba(255, 255, 255, 0.1)',
+                      borderRadius: '8px',
+                      color: 'white',
+                      width: '100%'
+                    }}
+                  />
+                  <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.5rem' }}>
+                    📅 Your video will be automatically uploaded at the selected time
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <button
+              type="submit"
+              className="submit-btn"
+              disabled={loading || files.length === 0}
+              onClick={isScheduled ? handleScheduledUpload : handleSubmit}
             >
-              <option value="">-- Select Hashtags --</option>
-              <option value="#viral #trending #reels">Viral & Trending (#viral #trending #reels)</option>
-              <option value="#comedy #funny #lol">Comedy & Fun (#comedy #funny #lol)</option>
-              <option value="#tech #innovation #gadgets">Technology (#tech #innovation)</option>
-              <option value="#travel #wanderlust #adventure">Travel (#travel #wanderlust)</option>
-              <option value="#food #foodie #delicious">Food & Cooking (#food #foodie)</option>
-              <option value="#fitness #gym #workout">Fitness & Health (#fitness #gym)</option>
-              <option value="#music #song #dance">Music & Dance (#music #song)</option>
-              <option value="#motivation #inspiration #quotes">Motivation (#motivation #quotes)</option>
-              <option value="#nature #beautiful #earth">Nature (#nature #beautiful)</option>
-              <option value="#gaming #gamer #stream">Gaming (#gaming #gamer)</option>
-            </select>
-          </div>
+              {loading ? 'Processing...' : isScheduled ? '📅 Schedule Upload' : `🚀 Upload Now (${files.length > 0 ? files.length : 0} video${files.length !== 1 ? 's' : ''})`}
+            </button>
+          </form>
+        )}
 
-          {error && <p style={{ color: '#f87171', fontSize: '0.9rem', marginBottom: '1rem' }}>{error}</p>}
-
-          <button type="submit" className="submit-btn" disabled={loading || files.length === 0}>
-            {loading ? 'Processing Queue...' : `Upload ${files.length > 0 ? files.length : ''} Video${files.length !== 1 ? 's' : ''}`}
-          </button>
-        </form>
+        {/* Scheduled Uploads View */}
+        {currentView === 'scheduled' && (
+          <ScheduledUploads baseUrl={getBaseUrl()} />
+        )}
       </div>
 
       {/* Modal for Upload Queue & Progress */}

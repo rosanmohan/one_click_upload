@@ -22,3 +22,8 @@ Thumbs.db
 # Secrets
 client_secret.json
 youtube_token.json
+
+# Scheduled Uploads
+backend/scheduled_videos/
+backend/scheduled_uploads.db
+

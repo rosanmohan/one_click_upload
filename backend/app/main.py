@@ -40,6 +40,10 @@ app.mount("/static", StaticFiles(directory=UPLOAD_DIR), name="static")
 
 from typing import List, Optional
 from app.services.video_processing_service import merge_videos
+from app.routers import scheduled_uploads
+
+# Include routers
+app.include_router(scheduled_uploads.router)
 
 @app.post("/api/upload")
 async def upload_video(
