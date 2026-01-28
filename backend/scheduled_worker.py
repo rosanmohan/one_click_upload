@@ -20,11 +20,11 @@ from app.services.instagram_service import upload_to_instagram
 def safe_print(message: str):
     """Safely print messages with emojis, handling Windows encoding issues."""
     try:
-        safe_print(message)
+        print(message)
     except UnicodeEncodeError:
         # Fallback to ASCII-safe version
         ascii_message = message.encode('ascii', 'replace').decode('ascii')
-        safe_print(ascii_message)
+        print(ascii_message)
 
 def execute_scheduled_uploads():
     """Main worker function to process pending scheduled uploads."""
