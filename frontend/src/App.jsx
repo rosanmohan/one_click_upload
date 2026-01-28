@@ -103,20 +103,26 @@ function App() {
     setError('');
     setLoading(true);
 
+
     const baseUrl = getBaseUrl();
     const formData = new FormData();
 
-    // For scheduled uploads, only allow single file (no merge for scheduled)
-    if (files.length > 1) {
-      setError("Scheduled uploads currently support only one video file.");
-      setLoading(false);
-      return;
+    // Support multiple files (with optional merge) for scheduled uploads
+    if (files.length === 1) {
+      // Single file
+      formData.append('file', files[0]);
+      const uploadTitle = title.trim() || files[0].name.replace(/\.[^/.]+$/, '');
+      formData.append('title', uploadTitle);
+    } else {
+      // Multiple files - attach all and set merge flag
+      files.forEach((file) => {
+        formData.append('files', file);
+      });
+      const uploadTitle = title.trim() || `${files.length} videos merged`;
+      formData.append('title', uploadTitle);
+      formData.append('merge_videos', mergeVideos ? 'true' : 'false');
     }
 
-    formData.append('file', files[0]);
-    // Use title if provided, otherwise use filename (without extension)
-    const uploadTitle = title.trim() || files[0].name.replace(/\.[^/.]+$/, '');
-    formData.append('title', uploadTitle);
     formData.append('description', description);
     formData.append('hashtags', hashtags);
     formData.append('scheduled_time', scheduledDateTime);

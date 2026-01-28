@@ -21,7 +21,8 @@ if not os.path.exists(UPLOAD_DIR):
 
 @router.post("/upload")
 async def schedule_upload(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    files: List[UploadFile] = File(None),
     title: str = Form(...),
     description: str = Form(""),
     hashtags: str = Form(""),
@@ -35,9 +36,12 @@ async def schedule_upload(
     """
     Schedule a video upload for a future date/time.
     
+    - **file**: Single file (for backward compatibility)
+    - **files**: Multiple files (for merging)
     - **scheduled_time**: ISO 8601 format (e.g., "2026-01-28T15:30:00")
     - **profile_id**: Profile to use for upload (default: "kids_fun")
     - **upload_youtube/facebook/instagram**: Enable/disable specific platforms
+    - **merge_videos**: If True and multiple files, merge them before upload
     """
     
     # Validate scheduled time is in the future
@@ -61,23 +65,56 @@ async def schedule_upload(
             detail="At least one upload platform must be selected"
         )
     
+    # Determine if single or multiple files
+    upload_files = []
+    if file:
+        upload_files = [file]
+    elif files:
+        upload_files = files
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail="At least one video file must be provided"
+        )
+    
     # Generate unique ID
     upload_id = str(uuid.uuid4())
     
-    # Save video file
-    file_extension = os.path.splitext(file.filename)[1]
-    video_filename = f"{upload_id}{file_extension}"
-    video_path = os.path.join(UPLOAD_DIR, video_filename)
-    
+    # Save video file(s)
+    saved_files = []
     try:
-        with open(video_path, "wb") as buffer:
-            shutil.copyfileobj(file.file, buffer)
+        for idx, upload_file in enumerate(upload_files):
+            file_extension = os.path.splitext(upload_file.filename)[1]
+            if len(upload_files) == 1:
+                video_filename = f"{upload_id}{file_extension}"
+            else:
+                video_filename = f"{upload_id}_part{idx+1}{file_extension}"
+            video_path = os.path.join(UPLOAD_DIR, video_filename)
+            
+            with open(video_path, "wb") as buffer:
+                shutil.copyfileobj(upload_file.file, buffer)
+            saved_files.append(video_path)
     except Exception as e:
+        # Clean up any saved files on error
+        for saved_path in saved_files:
+            if os.path.exists(saved_path):
+                os.remove(saved_path)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to save video file: {str(e)}"
         )
     
+    # Store multiple file paths as JSON if multiple files, otherwise single path
+    # The worker script will handle merging if merge_videos is True
+    import json
+    if len(saved_files) == 1:
+        final_video_path = saved_files[0]
+        final_video_filename = os.path.basename(final_video_path)
+    else:
+        # Store all paths as JSON - worker will merge them
+        final_video_path = json.dumps(saved_files)
+        final_video_filename = f"{upload_id}_multipart.json"
+
     # Create database entry
     try:
         result = create_scheduled_upload(
@@ -87,8 +124,8 @@ async def schedule_upload(
             description=description,
             hashtags=hashtags,
             scheduled_time=scheduled_time,
-            video_filename=video_filename,
-            video_path=video_path,
+            video_filename=final_video_filename,
+            video_path=final_video_path,
             merge_videos=merge_videos,
             upload_youtube=upload_youtube,
             upload_facebook=upload_facebook,
@@ -103,9 +140,10 @@ async def schedule_upload(
         })
     
     except Exception as e:
-        # Clean up video file if database insert fails
-        if os.path.exists(video_path):
-            os.remove(video_path)
+        # Clean up video file(s) if database insert fails
+        for saved_path in saved_files:
+            if os.path.exists(saved_path):
+                os.remove(saved_path)
         raise HTTPException(
             status_code=500,
             detail=f"Failed to schedule upload: {str(e)}"
