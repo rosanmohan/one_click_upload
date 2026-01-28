@@ -95,10 +95,6 @@ function App() {
       setError("Please select at least one video file.");
       return;
     }
-    if (!title.trim()) {
-      setError("Please provide a title for the scheduled upload.");
-      return;
-    }
     if (!scheduledDateTime) {
       setError("Please select a date and time for the upload.");
       return;
@@ -118,7 +114,9 @@ function App() {
     }
 
     formData.append('file', files[0]);
-    formData.append('title', title);
+    // Use title if provided, otherwise use filename (without extension)
+    const uploadTitle = title.trim() || files[0].name.replace(/\.[^/.]+$/, '');
+    formData.append('title', uploadTitle);
     formData.append('description', description);
     formData.append('hashtags', hashtags);
     formData.append('scheduled_time', scheduledDateTime);
@@ -683,26 +681,61 @@ function App() {
                   <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
                     Select Date & Time
                   </label>
-                  <input
-                    type="datetime-local"
-                    className="form-input"
-                    value={scheduledDateTime}
-                    onChange={(e) => setScheduledDateTime(e.target.value)}
-                    min={new Date().toISOString().slice(0, 16)}
-                    required={isScheduled}
-                    style={{
-                      padding: '0.75rem',
-                      fontSize: '1rem',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid rgba(255, 255, 255, 0.1)',
-                      borderRadius: '8px',
-                      color: 'white',
-                      width: '100%'
-                    }}
-                  />
-                  <p style={{ fontSize: '0.8rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-                    📅 Your video will be automatically uploaded at the selected time
-                  </p>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="datetime-local"
+                      className="form-input"
+                      value={scheduledDateTime}
+                      onChange={(e) => setScheduledDateTime(e.target.value)}
+                      min={new Date().toISOString().slice(0, 16)}
+                      required={isScheduled}
+                      style={{
+                        padding: '0.75rem',
+                        fontSize: '1rem',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: scheduledDateTime ? '2px solid #8b5cf6' : '1px solid rgba(255, 255, 255, 0.1)',
+                        borderRadius: '8px',
+                        color: 'white',
+                        width: '100%',
+                        transition: 'all 0.3s ease'
+                      }}
+                    />
+                    {scheduledDateTime && (
+                      <div style={{
+                        position: 'absolute',
+                        right: '0.75rem',
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        color: '#8b5cf6',
+                        fontSize: '1.25rem',
+                        pointerEvents: 'none'
+                      }}>
+                        ✓
+                      </div>
+                    )}
+                  </div>
+                  <div style={{
+                    fontSize: '0.8rem',
+                    color: scheduledDateTime ? '#8b5cf6' : '#94a3b8',
+                    marginTop: '0.5rem',
+                    display: 'flex',
+                    alignItems: 'start',
+                    gap: '0.5rem'
+                  }}>
+                    <span>💡</span>
+                    <div>
+                      {scheduledDateTime ? (
+                        <span>
+                          <strong>Scheduled for:</strong> {new Date(scheduledDateTime).toLocaleString('en-US', {
+                            dateStyle: 'medium',
+                            timeStyle: 'short'
+                          })}
+                        </span>
+                      ) : (
+                        <span>Click the calendar field above, select date and time, then click outside the picker to confirm</span>
+                      )}
+                    </div>
+                  </div>
                 </div>
               )}
             </div>
