@@ -48,6 +48,7 @@ def execute_scheduled_uploads():
         description = upload['description']
         hashtags = upload['hashtags']
         video_path = upload['video_path']
+        merge_videos_flag = upload.get('merge_videos', 0)
         
         safe_print(f"🎬 Processing Upload: {upload_id}")
         safe_print(f"   Profile: {profile_id}")
@@ -55,11 +56,56 @@ def execute_scheduled_uploads():
         safe_print(f"   Scheduled: {upload['scheduled_time']}")
         safe_print(f"   Video: {video_path}")
         
-        # Check if video file exists
+        # Check if video_path contains JSON (multiple files)
+        import json
+        video_files = []
+        merged_video_path = None
+        
+        try:
+            # Try to parse as JSON (multiple files)
+            video_files = json.loads(video_path)
+            safe_print(f"   📁 Multiple files detected: {len(video_files)} videos")
+            
+            # Verify all files exist
+            for vf in video_files:
+                if not os.path.exists(vf):
+                    error_msg = f"Video file not found: {vf}"
+                    safe_print(f"   ❌ Error: {error_msg}")
+                    update_upload_status(upload_id, 'failed', error_message=error_msg)
+                    continue
+            
+            # Merge videos if merge_videos flag is True
+            if merge_videos_flag:
+                safe_print(f"   🔄 Merging {len(video_files)} videos...")
+                try:
+                    from app.services.video_processing_service import merge_videos
+                    merged_video_path = merge_videos(video_files)
+                    safe_print(f"   ✅ Videos merged: {merged_video_path}")
+                    # Use merged video for upload
+                    video_path = merged_video_path
+                except Exception as e:
+                    error_msg = f"Failed to merge videos: {str(e)}"
+                    safe_print(f"   ❌ Error: {error_msg}")
+                    update_upload_status(upload_id, 'failed', error_message=error_msg)
+                    continue
+            else:
+                # If not merging, use first video
+                safe_print(f"   ℹ️ Using first video (merge not enabled)")
+                video_path = video_files[0]
+                
+        except (json.JSONDecodeError, TypeError):
+            # Single file path (not JSON)
+            video_files = [video_path]
+            safe_print(f"   📄 Single file")
+        
+        # Check if final video file exists
         if not os.path.exists(video_path):
             error_msg = f"Video file not found: {video_path}"
             safe_print(f"   ❌ Error: {error_msg}")
             update_upload_status(upload_id, 'failed', error_message=error_msg)
+            # Clean up any merged file
+            if merged_video_path and os.path.exists(merged_video_path):
+                os.remove(merged_video_path)
             continue
         
         # Load profile settings
@@ -69,6 +115,9 @@ def execute_scheduled_uploads():
             error_msg = f"Failed to load profile settings: {str(e)}"
             safe_print(f"   ❌ Error: {error_msg}")
             update_upload_status(upload_id, 'failed', error_message=error_msg)
+            # Clean up any merged file
+            if merged_video_path and os.path.exists(merged_video_path):
+                os.remove(merged_video_path)
             continue
         
         # Track upload results
@@ -155,13 +204,23 @@ def execute_scheduled_uploads():
             instagram_media_id=results['instagram']
         )
         
-        # Clean up video file after successful upload
+        # Clean up video files after successful upload
         if status == 'completed':
             try:
-                os.remove(video_path)
-                safe_print(f"   🗑️ Cleaned up video file")
+                # Clean up the final video file (uploaded one)
+                if os.path.exists(video_path):
+                    os.remove(video_path)
+                    safe_print(f"   🗑️ Cleaned up uploaded video file")
+                
+                # Clean up individual part files if they were merged
+                if merged_video_path and len(video_files) > 1:
+                    for vf in video_files:
+                        if os.path.exists(vf):
+                            os.remove(vf)
+                    safe_print(f"   🗑️ Cleaned up {len(video_files)} individual video parts")
+                    
             except Exception as e:
-                safe_print(f"   ⚠️ Could not delete video file: {str(e)}")
+                safe_print(f"   ⚠️ Could not delete video files: {str(e)}")
         
         safe_print()  # Blank line for readability
     

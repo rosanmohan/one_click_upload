@@ -197,13 +197,24 @@ def delete_scheduled_upload(upload_id: str) -> bool:
     conn.commit()
     conn.close()
     
-    # Delete the video file if it exists
-    if os.path.exists(video_path):
-        try:
-            os.remove(video_path)
-            safe_print(f"🗑️ Deleted video file: {video_path}")
-        except Exception as e:
-            safe_print(f"⚠️ Could not delete video file {video_path}: {e}")
+    # Delete the video file(s) - handle both single path and JSON array of paths
+    import json
+    try:
+        # Try to parse as JSON (multiple files)
+        video_files = json.loads(video_path)
+        # Multiple files - delete all
+        for vf in video_files:
+            if os.path.exists(vf):
+                os.remove(vf)
+        safe_print(f"🗑️ Deleted {len(video_files)} video files")
+    except (json.JSONDecodeError, TypeError):
+        # Single file path
+        if os.path.exists(video_path):
+            try:
+                os.remove(video_path)
+                safe_print(f"🗑️ Deleted video file: {video_path}")
+            except Exception as e:
+                safe_print(f"⚠️ Could not delete video file {video_path}: {e}")
     
     return True
 
