@@ -257,6 +257,7 @@ async def execute_scheduled_upload(upload_id: str):
         from app.services.youtube_service import upload_to_youtube
         from app.services.facebook_service import upload_to_facebook
         from app.services.instagram_service import upload_to_instagram
+        from app.services.cloudinary_service import upload_video_to_cloudinary, delete_video_from_cloudinary
         from app.database import update_upload_status
         
         profile_id = upload['profile_id']
@@ -315,40 +316,68 @@ async def execute_scheduled_upload(upload_id: str):
         # Execute uploads to enabled platforms
         if upload.get('upload_youtube') and settings.UPLOAD_YOUTUBE:
             try:
-                video_id = upload_to_youtube(
-                    video_path=video_path,
+                # Fix: Use correct argument names for YouTube
+                yt_result = upload_to_youtube(
+                    file_path=video_path,
                     title=title,
                     description=description,
-                    hashtags=hashtags,
-                    settings=settings
+                    tags=hashtags,
+                    config=settings
                 )
-                results['youtube'] = video_id
+                if yt_result.get('status') == 'success':
+                    # Extract video ID from data if available, or use a placeholder
+                    data = yt_result.get('data', {})
+                    video_id = data.get('id', 'uploaded')
+                    results['youtube'] = video_id
+                else:
+                    errors.append(f"YouTube: {yt_result.get('message', 'Unknown error')}")
             except Exception as e:
                 errors.append(f"YouTube: {str(e)}")
         
         if upload.get('upload_facebook') and settings.UPLOAD_FACEBOOK:
             try:
-                post_id = upload_to_facebook(
-                    video_path=video_path,
+                # Fix: Use correct argument names for Facebook
+                fb_result = upload_to_facebook(
+                    file_path=video_path,
                     title=title,
                     description=description,
-                    hashtags=hashtags,
-                    settings=settings
+                    config=settings
                 )
-                results['facebook'] = post_id
+                if fb_result.get('status') == 'success':
+                    data = fb_result.get('data', {})
+                    post_id = data.get('id', 'uploaded')
+                    results['facebook'] = post_id
+                else:
+                    errors.append(f"Facebook: {fb_result.get('message', 'Unknown error')}")
             except Exception as e:
                 errors.append(f"Facebook: {str(e)}")
         
         if upload.get('upload_instagram') and settings.UPLOAD_INSTAGRAM:
             try:
-                media_id = upload_to_instagram(
-                    video_path=video_path,
-                    title=title,
-                    description=description,
-                    hashtags=hashtags,
-                    settings=settings
-                )
-                results['instagram'] = media_id
+                # Fix: Instagram needs a public URL, so upload to Cloudinary first
+                cld_result = upload_video_to_cloudinary(video_path)
+                
+                if cld_result and cld_result.get('url'):
+                    video_url = cld_result.get('url')
+                    
+                    ig_result = upload_to_instagram(
+                        video_url=video_url,
+                        caption=description,
+                        config=settings
+                    )
+                    
+                    if ig_result.get('status') == 'success':
+                        data = ig_result.get('data', {})
+                        media_id = data.get('id', 'uploaded')
+                        results['instagram'] = media_id
+                    else:
+                        errors.append(f"Instagram: {ig_result.get('message', 'Unknown error')}")
+                        
+                    # Cleanup Cloudinary (optional, but good practice if checking storage)
+                    # delete_video_from_cloudinary(cld_result.get('public_id'))
+                else:
+                    errors.append("Instagram: Failed to upload to Cloudinary (required for Instagram)")
+                    
             except Exception as e:
                 errors.append(f"Instagram: {str(e)}")
         
