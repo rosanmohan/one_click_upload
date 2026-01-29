@@ -223,3 +223,215 @@ async def cancel_scheduled_upload(upload_id: str):
             status_code=500,
             detail=f"Failed to cancel scheduled upload: {str(e)}"
         )
+
+@router.post("/execute/{upload_id}")
+async def execute_scheduled_upload(upload_id: str):
+    """
+    Execute a specific scheduled upload now.
+    
+    This endpoint is called by the GitHub Actions worker to execute scheduled uploads.
+    It loads the upload details, executes the upload to platforms, and updates the status.
+    """
+    import json
+    try:
+        # Get upload details
+        upload = get_upload_by_id(upload_id)
+        if not upload:
+            raise HTTPException(
+                status_code=404,
+                detail="Scheduled upload not found"
+            )
+        
+        # Check if already completed
+        if upload['status'] == 'completed':
+            return JSONResponse(content={
+                "success": True,
+                "message": "Upload already completed",
+                "upload_id": upload_id
+            })
+        
+        # Import services
+        from app.config import get_settings
+        from app.services.video_processing_service import merge_videos
+        from app.services.youtube_service import upload_to_youtube
+        from app.services.facebook_service import upload_to_facebook
+        from app.services.instagram_service import upload_to_instagram
+        from app.database import update_upload_status
+        
+        profile_id = upload['profile_id']
+        title = upload['title']
+        description = upload['description']
+        hashtags = upload['hashtags']
+        video_path = upload['video_path']
+        merge_videos_flag = upload.get('merge_videos', 0)
+        
+        # Handle multiple files
+        video_files = []
+        merged_video_path = None
+        
+        try:
+            # Try to parse as JSON (multiple files)
+            video_files = json.loads(video_path)
+            
+            # Verify all files exist
+            for vf in video_files:
+                if not os.path.exists(vf):
+                    raise HTTPException(
+                        status_code=404,
+                        detail=f"Video file not found: {vf}"
+                    )
+            
+            # Merge videos if merge_videos flag is True
+            if merge_videos_flag and len(video_files) > 1:
+                merged_video_path = merge_videos(video_files)
+                video_path = merged_video_path
+            else:
+                # If not merging, use first video
+                video_path = video_files[0]
+                
+        except (json.JSONDecodeError, TypeError):
+            # Single file path (not JSON)
+            video_files = [video_path]
+        
+        # Verify final video exists
+        if not os.path.exists(video_path):
+            raise HTTPException(
+                status_code=404,
+                detail=f"Video file not found: {video_path}"
+            )
+        
+        # Load profile settings
+        settings = get_settings(profile_id)
+        
+        # Track upload results
+        results = {
+            'youtube': None,
+            'facebook': None,
+            'instagram': None
+        }
+        errors = []
+        
+        # Execute uploads to enabled platforms
+        if upload.get('upload_youtube') and settings.UPLOAD_YOUTUBE:
+            try:
+                video_id = upload_to_youtube(
+                    video_path=video_path,
+                    title=title,
+                    description=description,
+                    hashtags=hashtags,
+                    settings=settings
+                )
+                results['youtube'] = video_id
+            except Exception as e:
+                errors.append(f"YouTube: {str(e)}")
+        
+        if upload.get('upload_facebook') and settings.UPLOAD_FACEBOOK:
+            try:
+                post_id = upload_to_facebook(
+                    video_path=video_path,
+                    title=title,
+                    description=description,
+                    hashtags=hashtags,
+                    settings=settings
+                )
+                results['facebook'] = post_id
+            except Exception as e:
+                errors.append(f"Facebook: {str(e)}")
+        
+        if upload.get('upload_instagram') and settings.UPLOAD_INSTAGRAM:
+            try:
+                media_id = upload_to_instagram(
+                    video_path=video_path,
+                    title=title,
+                    description=description,
+                    hashtags=hashtags,
+                    settings=settings
+                )
+                results['instagram'] = media_id
+            except Exception as e:
+                errors.append(f"Instagram: {str(e)}")
+        
+        # Determine final status
+        successful_uploads = sum(1 for v in results.values() if v is not None)
+        
+        if errors and successful_uploads == 0:
+            # All failed
+            status = 'failed'
+            error_message = "; ".join(errors)
+        elif errors:
+            # Some failed
+            status = 'completed'
+            error_message = f"Partial success. Errors: {'; '.join(errors)}"
+        else:
+            # All successful
+            status = 'completed'
+            error_message = None
+        
+        # Update database
+        update_upload_status(
+            upload_id=upload_id,
+            status=status,
+            error_message=error_message,
+            youtube_video_id=results['youtube'],
+            facebook_post_id=results['facebook'],
+            instagram_media_id=results['instagram']
+        )
+        
+        # Clean up video files
+        try:
+            # Clean up final video
+            if os.path.exists(video_path):
+                os.remove(video_path)
+            
+            # Clean up individual parts if merged
+            if merged_video_path and len(video_files) > 1:
+                for vf in video_files:
+                    if os.path.exists(vf):
+                        os.remove(vf)
+        except Exception:
+            # Don't fail the request if cleanup fails
+            pass
+        
+        return JSONResponse(content={
+            "success": status == 'completed',
+            "message": "Upload executed" if status == 'completed' else "Upload failed",
+            "upload_id": upload_id,
+            "status": status,
+            "results": results,
+            "errors": errors if errors else None
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        # Update status to failed
+        try:
+            from app.database import update_upload_status
+            update_upload_status(upload_id, 'failed', error_message=str(e))
+        except:
+            pass
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to execute upload: {str(e)}"
+        )
+
+@router.get("/pending/ready")
+async def get_ready_uploads():
+    """
+    Get all uploads that are ready to execute (scheduled time has passed).
+    
+    This endpoint is called by the GitHub Actions worker to get the list of uploads to execute.
+    """
+    try:
+        from app.database import get_pending_uploads_to_execute
+        uploads = get_pending_uploads_to_execute()
+        return JSONResponse(content={
+            "success": True,
+            "count": len(uploads),
+            "uploads": uploads
+        })
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get ready uploads: {str(e)}"
+        )

@@ -29,62 +29,11 @@ jobs:
         working-directory: ./backend
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install requests
       
-      - name: Download scheduled_uploads.db from artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: scheduled-uploads-db
-          path: ./backend/
-        continue-on-error: true  # Don't fail if artifact doesn't exist yet
-      
-      - name: Execute scheduled worker
+      - name: Execute API-based worker
         working-directory: ./backend
         env:
-          # Global Settings
-          ALLOW_UPLOAD: ${{ secrets.ALLOW_UPLOAD }}
-          
-          # Kids Fun Profile
-          UPLOAD_FACEBOOK: ${{ secrets.UPLOAD_FACEBOOK }}
-          UPLOAD_INSTAGRAM: ${{ secrets.UPLOAD_INSTAGRAM }}
-          UPLOAD_YOUTUBE: ${{ secrets.UPLOAD_YOUTUBE }}
-          FACEBOOK_PAGE_ID: ${{ secrets.FACEBOOK_PAGE_ID }}
-          FACEBOOK_ACCESS_TOKEN: ${{ secrets.FACEBOOK_ACCESS_TOKEN }}
-          INSTAGRAM_BUSINESS_ACCOUNT_ID: ${{ secrets.INSTAGRAM_BUSINESS_ACCOUNT_ID }}
-          YOUTUBE_CLIENT_SECRET_FILE: profiles/kids_fun/client_secret.json
-          YOUTUBE_TOKEN_FILE: profiles/kids_fun/youtube_token.json
-          
-          # Ayesha Profile
-          AYESHA_UPLOAD_FACEBOOK: ${{ secrets.AYESHA_UPLOAD_FACEBOOK }}
-          AYESHA_UPLOAD_INSTAGRAM: ${{ secrets.AYESHA_UPLOAD_INSTAGRAM }}
-          AYESHA_UPLOAD_YOUTUBE: ${{ secrets.AYESHA_UPLOAD_YOUTUBE }}
-          AYESHA_FACEBOOK_PAGE_ID: ${{ secrets.AYESHA_FACEBOOK_PAGE_ID }}
-          AYESHA_FACEBOOK_ACCESS_TOKEN: ${{ secrets.AYESHA_FACEBOOK_ACCESS_TOKEN }}
-          AYESHA_INSTAGRAM_BUSINESS_ACCOUNT_ID: ${{ secrets.AYESHA_INSTAGRAM_BUSINESS_ACCOUNT_ID }}
-          
-          # Cloudinary
-          CLOUDINARY_CLOUD_NAME: ${{ secrets.CLOUDINARY_CLOUD_NAME }}
-          CLOUDINARY_API_KEY: ${{ secrets.CLOUDINARY_API_KEY }}
-          CLOUDINARY_API_SECRET: ${{ secrets.CLOUDINARY_API_SECRET }}
+          RENDER_BACKEND_URL: ${{ secrets.RENDER_BACKEND_URL }}
         run: |
-          python scheduled_worker.py
-      
-      - name: Upload scheduled_uploads.db as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: scheduled-uploads-db
-          path: ./backend/scheduled_uploads.db
-          retention-days: 90
-      
-      - name: Commit and push database changes (optional)
-        working-directory: ./backend
-        run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          
-          if [ -f "scheduled_uploads.db" ]; then
-            git add scheduled_uploads.db
-            git diff --staged --quiet || git commit -m "Update scheduled uploads database [skip ci]"
-            git push
-          fi
-        continue-on-error: true  # Don't fail workflow if commit fails
+          python api_worker.py
