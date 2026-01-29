@@ -47,7 +47,8 @@ async def schedule_upload(
     # Validate scheduled time is in the future
     try:
         scheduled_dt = datetime.fromisoformat(scheduled_time.replace('Z', '+00:00'))
-        if scheduled_dt <= datetime.utcnow():
+        current_time = datetime.now(timezone.utc)
+        if scheduled_dt <= current_time:
             raise HTTPException(
                 status_code=400,
                 detail="Scheduled time must be in the future"
