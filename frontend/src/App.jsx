@@ -125,7 +125,12 @@ function App() {
 
     formData.append('description', description);
     formData.append('hashtags', hashtags);
-    formData.append('scheduled_time', scheduledDateTime);
+
+    // Convert local datetime to UTC ISO 8601 format
+    const localDate = new Date(scheduledDateTime);
+    const utcDateString = localDate.toISOString(); // Converts to UTC: "2026-01-29T17:10:00.000Z"
+    formData.append('scheduled_time', utcDateString);
+
     formData.append('profile_id', selectedProfile);
     formData.append('upload_youtube', 'true');
     formData.append('upload_facebook', 'true');
