@@ -32,7 +32,7 @@ jobs:
           pip install -r requirements.txt
       
       - name: Download scheduled_uploads.db from artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           name: scheduled-uploads-db
           path: ./backend/
@@ -70,7 +70,7 @@ jobs:
           python scheduled_worker.py
       
       - name: Upload scheduled_uploads.db as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: scheduled-uploads-db
           path: ./backend/scheduled_uploads.db
