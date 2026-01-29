@@ -43,7 +43,7 @@ def execute_scheduled_uploads():
         
         uploads = data.get('uploads', [])
         safe_print(f"📋 Found {len(uploads)} pending upload(s) to process")
-        safe_print()
+        print()
         
         if not uploads:
             safe_print("✅ No pending uploads to process.")
@@ -91,7 +91,7 @@ def execute_scheduled_uploads():
             except Exception as e:
                 safe_print(f"   ❌ Unexpected error: {e}")
             
-            safe_print()  # Blank line for readability
+            print()  # Blank line for readability
         
         safe_print("=" * 60)
         safe_print(f"✅ Worker Completed at {datetime.now(timezone.utc).isoformat()}")
