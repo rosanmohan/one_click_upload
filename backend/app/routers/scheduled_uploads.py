@@ -81,9 +81,15 @@ async def schedule_upload(
     # Generate unique ID
     upload_id = str(uuid.uuid4())
     
-    # Save video file(s)
+    # Save video file(s) locally first, then upload to Cloudinary for persistence
     saved_files = []
+    updated_video_paths = []
+    
+    # Import Cloudinary service
+    from app.services.cloudinary_service import upload_video_to_cloudinary
+    
     try:
+        # 1. Save locally
         for idx, upload_file in enumerate(upload_files):
             file_extension = os.path.splitext(upload_file.filename)[1]
             if len(upload_files) == 1:
@@ -95,25 +101,51 @@ async def schedule_upload(
             with open(video_path, "wb") as buffer:
                 shutil.copyfileobj(upload_file.file, buffer)
             saved_files.append(video_path)
+            
+        # 2. Upload to Cloudinary (Critical for persistence on Render Free Tier)
+        from app.config import get_settings
+        settings_config = get_settings(profile_id)
+        
+        # Only upload if Cloudinary is configured
+        if settings_config.CLOUDINARY_CLOUD_NAME and settings_config.CLOUDINARY_API_KEY:
+            for saved_path in saved_files:
+                cld_result = upload_video_to_cloudinary(saved_path)
+                if cld_result and cld_result.get('url'):
+                    updated_video_paths.append(cld_result.get('url'))
+                    # Remove local file to save space (it's safe in cloud now)
+                    try:
+                        os.remove(saved_path)
+                    except:
+                        pass
+                else:
+                    # Fallback to local path if Cloudinary fails (risky on free tier)
+                    updated_video_paths.append(saved_path)
+        else:
+             # No Cloudinary configured, keep local paths
+             updated_video_paths = saved_files
+             
     except Exception as e:
         # Clean up any saved files on error
         for saved_path in saved_files:
             if os.path.exists(saved_path):
-                os.remove(saved_path)
+                try:
+                    os.remove(saved_path)
+                except:
+                    pass
         raise HTTPException(
             status_code=500,
-            detail=f"Failed to save video file: {str(e)}"
+            detail=f"Failed to save/upload video file: {str(e)}"
         )
     
     # Store multiple file paths as JSON if multiple files, otherwise single path
-    # The worker script will handle merging if merge_videos is True
     import json
-    if len(saved_files) == 1:
-        final_video_path = saved_files[0]
-        final_video_filename = os.path.basename(final_video_path)
+    if len(updated_video_paths) == 1:
+        final_video_path = updated_video_paths[0]
+        # Filename is just for reference/display
+        final_video_filename = os.path.basename(saved_files[0]) if saved_files else "video.mp4"
     else:
-        # Store all paths as JSON - worker will merge them
-        final_video_path = json.dumps(saved_files)
+        # Store all paths (URLs) as JSON - worker will handle them
+        final_video_path = json.dumps(updated_video_paths)
         final_video_filename = f"{upload_id}_multipart.json"
 
     # Create database entry
@@ -269,19 +301,49 @@ async def execute_scheduled_upload(upload_id: str):
         
         # Handle multiple files
         video_files = []
+        downloaded_temp_files = [] # Keep track to delete later
         merged_video_path = None
+        
+        # Helper to download file if URL
+        import requests
+        import tempfile
+        
+        def get_local_file_path(path_or_url):
+            if path_or_url.startswith('http'):
+                try:
+                    # Download to temp file
+                    print(f"Downloading from Cloudinary: {path_or_url}")
+                    suffix = os.path.splitext(path_or_url)[1]
+                    if not suffix or len(suffix) > 5: # basic check
+                         suffix = '.mp4'
+                         
+                    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+                        with requests.get(path_or_url, stream=True) as r:
+                            r.raise_for_status()
+                            shutil.copyfileobj(r.raw, tmp)
+                        temp_path = tmp.name
+                        downloaded_temp_files.append(temp_path)
+                        return temp_path
+                except Exception as e:
+                    raise Exception(f"Failed to download video from URL: {e}")
+            return path_or_url
         
         try:
             # Try to parse as JSON (multiple files)
-            video_files = json.loads(video_path)
-            
-            # Verify all files exist
-            for vf in video_files:
-                if not os.path.exists(vf):
-                    raise HTTPException(
+            parsed_files = json.loads(video_path)
+            # Ensure it's a list
+            if not isinstance(parsed_files, list):
+                parsed_files = [parsed_files]
+                
+            # Convert all paths/URLs to local files
+            for vf in parsed_files:
+                local_path = get_local_file_path(vf)
+                if not os.path.exists(local_path):
+                     raise HTTPException(
                         status_code=404,
-                        detail=f"Video file not found: {vf}"
+                        detail=f"Video file not found locally or failed to download: {vf}"
                     )
+                video_files.append(local_path)
             
             # Merge videos if merge_videos flag is True
             if merge_videos_flag and len(video_files) > 1:
@@ -293,7 +355,14 @@ async def execute_scheduled_upload(upload_id: str):
                 
         except (json.JSONDecodeError, TypeError):
             # Single file path (not JSON)
-            video_files = [video_path]
+            local_path = get_local_file_path(video_path)
+            if not os.path.exists(local_path):
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Video file not found: {video_path}"
+                )
+            video_files = [local_path]
+            video_path = local_path
         
         # Verify final video exists
         if not os.path.exists(video_path):
@@ -410,14 +479,22 @@ async def execute_scheduled_upload(upload_id: str):
         # Clean up video files
         try:
             # Clean up final video
-            if os.path.exists(video_path):
+            if video_path and os.path.exists(video_path):
                 os.remove(video_path)
             
             # Clean up individual parts if merged
             if merged_video_path and len(video_files) > 1:
                 for vf in video_files:
-                    if os.path.exists(vf):
+                    if vf and os.path.exists(vf):
                         os.remove(vf)
+            
+            # Clean up explicit temp files (redundancy check)
+            for temp_f in downloaded_temp_files:
+                if temp_f and os.path.exists(temp_f):
+                    try:
+                        os.remove(temp_f)
+                    except:
+                        pass
         except Exception:
             # Don't fail the request if cleanup fails
             pass
