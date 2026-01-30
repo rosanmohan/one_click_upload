@@ -29,13 +29,29 @@ def execute_scheduled_uploads():
         safe_print("=" * 60)
         
         # Get uploads ready to execute from API
-        try:
-            response = requests.get(f"{BACKEND_URL}/api/scheduled/pending/ready", timeout=30)
-            response.raise_for_status()
-            data = response.json()
-        except requests.exceptions.RequestException as e:
-            safe_print(f"❌ Failed to fetch ready uploads from API: {e}")
-            return
+        # We use a retry loop to handle "cold starts" where Render might take 60s+ to wake up
+        max_retries = 3
+        data = None
+        
+        from time import sleep
+        
+        for attempt in range(max_retries):
+            try:
+                if attempt > 0:
+                    safe_print(f"   ⚠️ Attempt {attempt+1}/{max_retries}: Server might be waking up... waiting 10s")
+                    sleep(10)
+                
+                # Increased timeout to 90s for cold starts
+                response = requests.get(f"{BACKEND_URL}/api/scheduled/pending/ready", timeout=90)
+                response.raise_for_status()
+                data = response.json()
+                break # Success!
+                
+            except requests.exceptions.RequestException as e:
+                safe_print(f"   ⚠️ Connection failed (Attempt {attempt+1}): {e}")
+                if attempt == max_retries - 1:
+                    safe_print(f"❌ Failed to fetch ready uploads after {max_retries} attempts.")
+                    return
         
         if not data.get('success'):
             safe_print(f"❌ API returned error: {data}")
