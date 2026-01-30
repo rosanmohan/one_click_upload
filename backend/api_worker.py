@@ -104,6 +104,8 @@ def execute_scheduled_uploads():
                 safe_print(f"   ⏱️ Upload TIMEOUT (may still be processing)")
             except requests.exceptions.RequestException as e:
                 safe_print(f"   ❌ API Error: {e}")
+                if hasattr(e, 'response') and e.response is not None:
+                     safe_print(f"      Server Response: {e.response.text}")
             except Exception as e:
                 safe_print(f"   ❌ Unexpected error: {e}")
             
