@@ -725,6 +725,37 @@ function App() {
                       </div>
                     )}
                   </div>
+
+                  {/* Confirmation message */}
+                  {scheduledDateTime && (
+                    <div style={{
+                      marginTop: '0.75rem',
+                      padding: '0.75rem',
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05))',
+                      border: '1px solid rgba(139, 92, 246, 0.3)',
+                      borderRadius: '8px',
+                      animation: 'pulse 2s ease-in-out infinite'
+                    }}>
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '0.5rem',
+                        color: '#a78bfa',
+                        fontSize: '0.9rem',
+                        fontWeight: '500'
+                      }}>
+                        <Calendar size={16} />
+                        Scheduled for: {new Date(scheduledDateTime).toLocaleString('en-US', {
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div style={{
                     fontSize: '0.8rem',
                     color: scheduledDateTime ? '#8b5cf6' : '#94a3b8',
