@@ -2,7 +2,7 @@
   width: 100%;
   max-width: 600px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem;
 }
 
 .glass-card {
@@ -10,20 +10,20 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
-  border-radius: 1.5rem;
-  padding: 2.5rem;
+  border-radius: 1.25rem;
+  padding: 1.5rem;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
 }
 
 .header {
   text-align: center;
-  margin-bottom: 2rem;
+  margin-bottom: 1rem;
 }
 
 .header h1 {
-  font-size: 2rem;
+  font-size: 1.75rem;
   font-weight: 700;
-  margin: 0 0 0.5rem 0;
+  margin: 0 0 0.35rem 0;
   background: linear-gradient(to right, #60a5fa, #c084fc);
   -webkit-background-clip: text;
   background-clip: text;
@@ -32,18 +32,18 @@
 
 .header p {
   color: var(--text-secondary);
-  font-size: 0.95rem;
+  font-size: 0.875rem;
 }
 
 .form-group {
-  margin-bottom: 1.5rem;
+  margin-bottom: 0.75rem;
 }
 
 .form-label {
   display: block;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
   font-weight: 500;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.35rem;
   color: var(--text-secondary);
 }
 
@@ -52,11 +52,11 @@
   width: 100%;
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid var(--glass-border);
-  border-radius: 0.75rem;
-  padding: 0.8rem 1rem;
+  border-radius: 0.5rem;
+  padding: 0.5rem 0.75rem;
   color: white;
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 0.9rem;
   transition: all 0.2s;
 }
 
@@ -64,18 +64,18 @@
 .form-textarea:focus {
   outline: none;
   border-color: #60a5fa;
-  box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+  box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.15);
 }
 
 .form-textarea {
-  min-height: 100px;
+  min-height: 60px;
   resize: vertical;
 }
 
 .file-upload-zone {
   border: 2px dashed var(--glass-border);
-  border-radius: 1rem;
-  padding: 2rem;
+  border-radius: 0.75rem;
+  padding: 1.25rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s;
