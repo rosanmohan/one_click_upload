@@ -328,9 +328,26 @@ async def execute_scheduled_upload(upload_id: str):
                     raise Exception(f"Failed to download video from URL: {e}")
             return path_or_url
         
+        print(f"DEBUG: Processing video_path: {video_path!r}")
+        
         try:
             # Try to parse as JSON (multiple files)
-            parsed_files = json.loads(video_path)
+            parsed_files = None
+            try:
+                parsed_files = json.loads(video_path)
+            except json.JSONDecodeError:
+                # Fallback: if it looks like a list but failed JSON storage (e.g. single quotes)
+                if isinstance(video_path, str) and video_path.strip().startswith('[') and video_path.strip().endswith(']'):
+                    import ast
+                    try:
+                        parsed_files = ast.literal_eval(video_path)
+                        print("DEBUG: Parsed video_path using ast.literal_eval")
+                    except:
+                        pass
+                
+                if parsed_files is None:
+                    raise # Re-raise to go to outer except
+
             # Ensure it's a list
             if not isinstance(parsed_files, list):
                 parsed_files = [parsed_files]
@@ -353,7 +370,7 @@ async def execute_scheduled_upload(upload_id: str):
                 # If not merging, use first video
                 video_path = video_files[0]
                 
-        except (json.JSONDecodeError, TypeError):
+        except (json.JSONDecodeError, TypeError, ValueError) as e:
             # Single file path (not JSON)
             local_path = get_local_file_path(video_path)
             if not os.path.exists(local_path):
