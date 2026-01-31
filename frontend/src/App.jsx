@@ -526,9 +526,21 @@ function App() {
 
               {/* File List */}
               {files.length > 0 && (
-                <div style={{ marginTop: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                <div style={{
+                  marginTop: '1rem',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '0.5rem',
+                  maxHeight: '20vh',
+                  overflowY: 'auto',
+                  overflowX: 'hidden',
+                  padding: '0.5rem',
+                  background: 'rgba(15, 23, 42, 0.3)',
+                  borderRadius: '0.5rem',
+                  border: '1px solid rgba(255, 255, 255, 0.1)'
+                }}>
                   {files.map((f, i) => (
-                    <div key={i} className="file-info" style={{ justifyContent: 'space-between' }}>
+                    <div key={i} className="file-info" style={{ justifyContent: 'space-between', margin: 0 }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                         <span style={{
                           background: '#334155',
@@ -540,17 +552,18 @@ function App() {
                           alignItems: 'center',
                           justifyContent: 'center',
                           fontSize: '0.75rem',
-                          fontWeight: 'bold'
+                          fontWeight: 'bold',
+                          flexShrink: 0
                         }}>
                           {i + 1}
                         </span>
-                        <FileVideo size={18} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '200px' }}>
+                        <FileVideo size={18} style={{ flexShrink: 0 }} />
+                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1, minWidth: 0 }}>
                           {f.name}
                         </span>
                       </div>
 
-                      <div style={{ display: 'flex', gap: '4px' }}>
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                         {/* Reordering Controls */}
                         {files.length > 1 && (
                           <>
@@ -664,170 +677,177 @@ function App() {
               borderRadius: '8px',
               border: '1px solid rgba(139, 92, 246, 0.3)'
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: isScheduled ? '1rem' : 0 }}>
-                <input
-                  type="checkbox"
-                  id="scheduleCheck"
-                  checked={isScheduled}
-                  onChange={(e) => {
-                    setIsScheduled(e.target.checked);
-                    if (!e.target.checked) setScheduledDateTime('');
-                  }}
-                  style={{ width: '18px', height: '18px', accentColor: '#8b5cf6', cursor: 'pointer' }}
-                />
-                <label htmlFor="scheduleCheck" style={{
-                  color: 'white',
-                  fontSize: '1rem',
-                  cursor: 'pointer',
-                  fontWeight: '600',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '0.5rem'
-                }}>
-                  <Calendar size={18} />
-                  Schedule for later?
-                </label>
-              </div>
-
-              {isScheduled && (
-                <div>
-                  <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
-                    Select Date & Time
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <DatePicker
-                      selected={scheduledDateTime}
-                      onChange={(date) => setScheduledDateTime(date)}
-                      showTimeSelect
-                      timeFormat="HH:mm"
-                      timeIntervals={30}
-                      dateFormat="MMMM d, yyyy h:mm aa"
-                      minDate={new Date()}
-                      placeholderText="Click to select date and time"
-                      required={isScheduled}
-                      className="form-input"
-                      calendarClassName="custom-calendar"
-                      popperPlacement="bottom-start"
-                      popperModifiers={[
-                        {
-                          name: 'offset',
-                          options: {
-                            offset: [0, 8],
-                          },
-                        },
-                      ]}
-                    >
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        padding: '12px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                        background: 'rgba(31, 41, 55, 0.98)'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (scheduledDateTime) {
-                              // Close the calendar
-                              const calendar = document.querySelector('.react-datepicker__close-icon');
-                              if (calendar) calendar.click();
-                              // Or just blur the input
-                              document.activeElement?.blur();
-                            }
-                          }}
-                          style={{
-                            padding: '10px 32px',
-                            background: scheduledDateTime
-                              ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
-                              : 'rgba(139, 92, 246, 0.3)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '8px',
-                            fontWeight: '600',
-                            cursor: scheduledDateTime ? 'pointer' : 'not-allowed',
-                            transition: 'all 0.2s',
-                            fontSize: '1rem',
-                            boxShadow: scheduledDateTime ? '0 4px 12px rgba(139, 92, 246, 0.4)' : 'none'
-                          }}
-                          disabled={!scheduledDateTime}
-                        >
-                          ✓ Set Schedule
-                        </button>
-                      </div>
-                    </DatePicker>
-                    {scheduledDateTime && (
-                      <div style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: '#8b5cf6',
-                        fontSize: '1.25rem',
-                        pointerEvents: 'none',
-                        zIndex: 1
-                      }}>
-                        ✓
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Confirmation message */}
-                  {scheduledDateTime && (
-                    <div className="schedule-confirmation" style={{
-                      marginTop: '0.75rem',
-                      padding: '0.75rem',
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.05))',
-                      border: '2px solid rgba(139, 92, 246, 0.4)',
-                      borderRadius: '10px'
-                    }}>
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '0.5rem',
-                        color: '#a78bfa',
-                        fontSize: '0.9rem',
-                        fontWeight: '600'
-                      }}>
-                        <Calendar size={18} />
-                        <div>
-                          <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.15rem' }}>Scheduled:</div>
-                          {scheduledDateTime.toLocaleString('en-US', {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          })}
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div style={{
-                    fontSize: '0.8rem',
-                    color: scheduledDateTime ? '#8b5cf6' : '#94a3b8',
-                    marginTop: '0.5rem',
+              {/* Schedule Section - Fixed height to prevent layout shift */}
+              <div style={{
+                minHeight: isScheduled ? 'auto' : '0',
+                transition: 'all 0.3s ease',
+                overflow: 'hidden'
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '1vh' }}>
+                  <input
+                    type="checkbox"
+                    id="scheduleCheck"
+                    checked={isScheduled}
+                    onChange={(e) => {
+                      setIsScheduled(e.target.checked);
+                      if (!e.target.checked) setScheduledDateTime('');
+                    }}
+                    style={{ width: '18px', height: '18px', accentColor: '#8b5cf6', cursor: 'pointer' }}
+                  />
+                  <label htmlFor="scheduleCheck" style={{
+                    color: 'white',
+                    fontSize: '1rem',
+                    cursor: 'pointer',
+                    fontWeight: '600',
                     display: 'flex',
-                    alignItems: 'start',
+                    alignItems: 'center',
                     gap: '0.5rem'
                   }}>
-                    <span>💡</span>
-                    <div>
-                      {scheduledDateTime ? (
-                        <span>
-                          <strong>Scheduled for:</strong> {new Date(scheduledDateTime).toLocaleString('en-US', {
-                            dateStyle: 'medium',
-                            timeStyle: 'short'
-                          })}
-                        </span>
-                      ) : (
-                        <span>Click the calendar field above, select date and time, then click outside the picker to confirm</span>
+                    <Calendar size={18} />
+                    Schedule for later?
+                  </label>
+                </div>
+
+                {isScheduled && (
+                  <div>
+                    <label className="form-label" style={{ marginBottom: '0.5rem', display: 'block' }}>
+                      Select Date & Time
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <DatePicker
+                        selected={scheduledDateTime}
+                        onChange={(date) => setScheduledDateTime(date)}
+                        showTimeSelect
+                        timeFormat="HH:mm"
+                        timeIntervals={30}
+                        dateFormat="MMMM d, yyyy h:mm aa"
+                        minDate={new Date()}
+                        placeholderText="Click to select date and time"
+                        required={isScheduled}
+                        className="form-input"
+                        calendarClassName="custom-calendar"
+                        popperPlacement="bottom-start"
+                        popperModifiers={[
+                          {
+                            name: 'offset',
+                            options: {
+                              offset: [0, 8],
+                            },
+                          },
+                        ]}
+                      >
+                        <div style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          padding: '12px',
+                          borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                          background: 'rgba(31, 41, 55, 0.98)'
+                        }}>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              if (scheduledDateTime) {
+                                // Close the calendar
+                                const calendar = document.querySelector('.react-datepicker__close-icon');
+                                if (calendar) calendar.click();
+                                // Or just blur the input
+                                document.activeElement?.blur();
+                              }
+                            }}
+                            style={{
+                              padding: '10px 32px',
+                              background: scheduledDateTime
+                                ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+                                : 'rgba(139, 92, 246, 0.3)',
+                              color: 'white',
+                              border: 'none',
+                              borderRadius: '8px',
+                              fontWeight: '600',
+                              cursor: scheduledDateTime ? 'pointer' : 'not-allowed',
+                              transition: 'all 0.2s',
+                              fontSize: '1rem',
+                              boxShadow: scheduledDateTime ? '0 4px 12px rgba(139, 92, 246, 0.4)' : 'none'
+                            }}
+                            disabled={!scheduledDateTime}
+                          >
+                            ✓ Set Schedule
+                          </button>
+                        </div>
+                      </DatePicker>
+                      {scheduledDateTime && (
+                        <div style={{
+                          position: 'absolute',
+                          right: '0.75rem',
+                          top: '50%',
+                          transform: 'translateY(-50%)',
+                          color: '#8b5cf6',
+                          fontSize: '1.25rem',
+                          pointerEvents: 'none',
+                          zIndex: 1
+                        }}>
+                          ✓
+                        </div>
                       )}
                     </div>
+
+                    {/* Confirmation message */}
+                    {scheduledDateTime && (
+                      <div className="schedule-confirmation" style={{
+                        marginTop: '0.75rem',
+                        padding: '0.75rem',
+                        background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.05))',
+                        border: '2px solid rgba(139, 92, 246, 0.4)',
+                        borderRadius: '10px'
+                      }}>
+                        <div style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem',
+                          color: '#a78bfa',
+                          fontSize: '0.9rem',
+                          fontWeight: '600'
+                        }}>
+                          <Calendar size={18} />
+                          <div>
+                            <div style={{ fontSize: '0.75rem', color: '#9ca3af', marginBottom: '0.15rem' }}>Scheduled:</div>
+                            {scheduledDateTime.toLocaleString('en-US', {
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div style={{
+                      fontSize: '0.8rem',
+                      color: scheduledDateTime ? '#8b5cf6' : '#94a3b8',
+                      marginTop: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'start',
+                      gap: '0.5rem'
+                    }}>
+                      <span>💡</span>
+                      <div>
+                        {scheduledDateTime ? (
+                          <span>
+                            <strong>Scheduled for:</strong> {new Date(scheduledDateTime).toLocaleString('en-US', {
+                              dateStyle: 'medium',
+                              timeStyle: 'short'
+                            })}
+                          </span>
+                        ) : (
+                          <span>Click the calendar field above, select date and time, then click outside the picker to confirm</span>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
             </div>
 
             <button
