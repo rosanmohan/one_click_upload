@@ -23,6 +23,7 @@ function App() {
   // Scheduling feature
   const [isScheduled, setIsScheduled] = useState(false);
   const [scheduledDateTime, setScheduledDateTime] = useState(null); // Changed to Date object for DatePicker
+  const [calendarOpen, setCalendarOpen] = useState(false); // Control calendar popup
   const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'scheduled'
 
   // currentFileIndex tracks which file is currently being processed in the loop
@@ -677,7 +678,7 @@ function App() {
               borderRadius: '8px',
               border: '1px solid rgba(139, 92, 246, 0.3)'
             }}>
-              {/* Schedule Section - Calendar auto-opens when checked */}
+              {/* Schedule Section - Calendar opens on checkbox click */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -689,15 +690,13 @@ function App() {
                   id="scheduleCheck"
                   checked={isScheduled}
                   onChange={(e) => {
-                    setIsScheduled(e.target.checked);
-                    if (!e.target.checked) {
+                    const checked = e.target.checked;
+                    setIsScheduled(checked);
+                    if (!checked) {
                       setScheduledDateTime(null);
+                      setCalendarOpen(false);
                     } else {
-                      // Auto-open calendar when checked
-                      setTimeout(() => {
-                        const dateInput = document.querySelector('.schedule-datepicker input');
-                        if (dateInput) dateInput.click();
-                      }, 100);
+                      setCalendarOpen(true); // Auto-open calendar
                     }
                   }}
                   style={{ width: '18px', height: '18px', accentColor: '#8b5cf6', cursor: 'pointer' }}
@@ -736,10 +735,7 @@ function App() {
                     })}</span>
                     <button
                       type="button"
-                      onClick={() => {
-                        const dateInput = document.querySelector('.schedule-datepicker input');
-                        if (dateInput) dateInput.click();
-                      }}
+                      onClick={() => setCalendarOpen(true)}
                       style={{
                         background: 'none',
                         border: 'none',
@@ -754,74 +750,75 @@ function App() {
                     </button>
                   </div>
                 )}
+              </div>
 
-                {isScheduled && (
-                  <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: isScheduled && !scheduledDateTime ? 'auto' : 'none' }} className="schedule-datepicker">
-                    <DatePicker
-                      selected={scheduledDateTime}
-                      onChange={(date) => setScheduledDateTime(date)}
-                      showTimeSelect
-                      timeFormat="HH:mm"
-                      timeIntervals={30}
-                      dateFormat="MMM d, yyyy h:mm aa"
-                      minDate={new Date()}
-                      placeholderText="Select date and time"
-                      required={isScheduled}
-                      className="form-input"
-                      calendarClassName="custom-calendar"
-                      open={isScheduled && !scheduledDateTime}
-                      onClickOutside={() => {
-                        if (!scheduledDateTime) {
-                          setIsScheduled(false);
+              {/* Hidden DatePicker that opens as popup */}
+              {isScheduled && (
+                <DatePicker
+                  selected={scheduledDateTime}
+                  onChange={(date) => {
+                    setScheduledDateTime(date);
+                    setCalendarOpen(false); // Close after selection
+                  }}
+                  showTimeSelect
+                  timeFormat="HH:mm"
+                  timeIntervals={30}
+                  dateFormat="MMM d, yyyy h:mm aa"
+                  minDate={new Date()}
+                  open={calendarOpen}
+                  onClickOutside={() => {
+                    setCalendarOpen(false);
+                    if (!scheduledDateTime) {
+                      setIsScheduled(false); // Uncheck if no date selected
+                    }
+                  }}
+                  onCalendarClose={() => setCalendarOpen(false)}
+                  customInput={<div style={{ display: 'none' }} />}
+                  popperPlacement="bottom-start"
+                  popperModifiers={[
+                    {
+                      name: 'offset',
+                      options: {
+                        offset: [50, 8],
+                      },
+                    },
+                  ]}
+                >
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'center',
+                    padding: '10px',
+                    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                    background: 'rgba(31, 41, 55, 0.98)'
+                  }}>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (scheduledDateTime) {
+                          setCalendarOpen(false);
                         }
                       }}
-                      popperPlacement="bottom-start"
-                      popperModifiers={[
-                        {
-                          name: 'offset',
-                          options: {
-                            offset: [0, 4],
-                          },
-                        },
-                      ]}
+                      style={{
+                        padding: '8px 24px',
+                        background: scheduledDateTime
+                          ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+                          : 'rgba(139, 92, 246, 0.3)',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontWeight: '600',
+                        cursor: scheduledDateTime ? 'pointer' : 'not-allowed',
+                        transition: 'all 0.2s',
+                        fontSize: '0.95rem'
+                      }}
+                      disabled={!scheduledDateTime}
                     >
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'center',
-                        padding: '10px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                        background: 'rgba(31, 41, 55, 0.98)'
-                      }}>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (scheduledDateTime) {
-                              document.activeElement?.blur();
-                            }
-                          }}
-                          style={{
-                            padding: '8px 24px',
-                            background: scheduledDateTime
-                              ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
-                              : 'rgba(139, 92, 246, 0.3)',
-                            color: 'white',
-                            border: 'none',
-                            borderRadius: '6px',
-                            fontWeight: '600',
-                            cursor: scheduledDateTime ? 'pointer' : 'not-allowed',
-                            transition: 'all 0.2s',
-                            fontSize: '0.95rem'
-                          }}
-                          disabled={!scheduledDateTime}
-                        >
-                          ✓ Set
-                        </button>
-                      </div>
-                    </DatePicker>
+                      ✓ Set
+                    </button>
                   </div>
-                )}
-              </div>
+                </DatePicker>
+              )}
             </div>
 
             <button
