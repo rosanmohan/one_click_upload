@@ -678,12 +678,11 @@ function App() {
               borderRadius: '8px',
               border: '1px solid rgba(139, 92, 246, 0.3)'
             }}>
-              {/* Schedule Section - Calendar opens on checkbox click */}
+              {/* Schedule Checkbox - Calendar opens as modal popup */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '10px',
-                flexWrap: 'wrap'
+                gap: '10px'
               }}>
                 <input
                   type="checkbox"
@@ -696,7 +695,7 @@ function App() {
                       setScheduledDateTime(null);
                       setCalendarOpen(false);
                     } else {
-                      setCalendarOpen(true); // Auto-open calendar
+                      setCalendarOpen(true); // Open calendar popup
                     }
                   }}
                   style={{ width: '18px', height: '18px', accentColor: '#8b5cf6', cursor: 'pointer' }}
@@ -712,93 +711,98 @@ function App() {
                 }}>
                   <Calendar size={18} />
                   Schedule for later?
+                  {scheduledDateTime && (
+                    <span style={{
+                      marginLeft: '0.5rem',
+                      padding: '0.25rem 0.5rem',
+                      background: 'rgba(139, 92, 246, 0.2)',
+                      border: '1px solid rgba(139, 92, 246, 0.4)',
+                      borderRadius: '4px',
+                      fontSize: '0.75rem',
+                      color: '#a78bfa'
+                    }}>
+                      {scheduledDateTime.toLocaleString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        hour: '2-digit',
+                        minute: '2-digit'
+                      })}
+                    </span>
+                  )}
                 </label>
-
-                {scheduledDateTime && (
-                  <div style={{
-                    display: 'inline-flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    padding: '0.35rem 0.75rem',
-                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1))',
-                    border: '1px solid rgba(139, 92, 246, 0.4)',
-                    borderRadius: '6px',
-                    fontSize: '0.85rem',
-                    color: '#a78bfa'
-                  }}>
-                    <Calendar size={14} />
-                    <span>{scheduledDateTime.toLocaleString('en-US', {
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}</span>
-                    <button
-                      type="button"
-                      onClick={() => setCalendarOpen(true)}
-                      style={{
-                        background: 'none',
-                        border: 'none',
-                        color: '#a78bfa',
-                        cursor: 'pointer',
-                        padding: '0 4px',
-                        fontSize: '0.85rem',
-                        textDecoration: 'underline'
-                      }}
-                    >
-                      Change
-                    </button>
-                  </div>
-                )}
               </div>
+            </div>
 
-              {/* Hidden DatePicker that opens as popup */}
-              {isScheduled && (
-                <DatePicker
-                  selected={scheduledDateTime}
-                  onChange={(date) => {
-                    setScheduledDateTime(date);
-                    setCalendarOpen(false); // Close after selection
-                  }}
-                  showTimeSelect
-                  timeFormat="HH:mm"
-                  timeIntervals={30}
-                  dateFormat="MMM d, yyyy h:mm aa"
-                  minDate={new Date()}
-                  open={calendarOpen}
-                  onClickOutside={() => {
-                    setCalendarOpen(false);
-                    if (!scheduledDateTime) {
-                      setIsScheduled(false); // Uncheck if no date selected
-                    }
-                  }}
-                  onCalendarClose={() => setCalendarOpen(false)}
-                  customInput={<div style={{ display: 'none' }} />}
-                  popperPlacement="bottom-start"
-                  popperModifiers={[
-                    {
-                      name: 'offset',
-                      options: {
-                        offset: [50, 8],
-                      },
-                    },
-                  ]}
-                >
+            {/* Floating Calendar Modal Popup */}
+            {isScheduled && calendarOpen && (
+              <div style={{
+                position: 'fixed',
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'rgba(0, 0, 0, 0.7)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                zIndex: 9999
+              }}
+                onClick={() => {
+                  setCalendarOpen(false);
+                  if (!scheduledDateTime) {
+                    setIsScheduled(false);
+                  }
+                }}
+              >
+                <div onClick={(e) => e.stopPropagation()} style={{
+                  background: '#1f2937',
+                  borderRadius: '12px',
+                  padding: '1rem',
+                  boxShadow: '0 20px 60px rgba(0, 0, 0, 0.8)',
+                  border: '1px solid rgba(139, 92, 246, 0.3)'
+                }}>
+                  <DatePicker
+                    selected={scheduledDateTime}
+                    onChange={(date) => setScheduledDateTime(date)}
+                    showTimeSelect
+                    timeFormat="HH:mm"
+                    timeIntervals={30}
+                    dateFormat="MMM d, yyyy h:mm aa"
+                    minDate={new Date()}
+                    inline
+                  />
                   <div style={{
                     display: 'flex',
-                    justifyContent: 'center',
-                    padding: '10px',
-                    borderTop: '1px solid rgba(255, 255, 255, 0.1)',
-                    background: 'rgba(31, 41, 55, 0.98)'
+                    gap: '0.5rem',
+                    marginTop: '1rem',
+                    justifyContent: 'flex-end'
                   }}>
                     <button
                       type="button"
-                      onClick={(e) => {
-                        e.preventDefault();
+                      onClick={() => {
+                        setCalendarOpen(false);
+                        setIsScheduled(false);
+                        setScheduledDateTime(null);
+                      }}
+                      style={{
+                        padding: '8px 16px',
+                        background: 'rgba(255, 255, 255, 0.1)',
+                        color: 'white',
+                        border: '1px solid rgba(255, 255, 255, 0.2)',
+                        borderRadius: '6px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         if (scheduledDateTime) {
                           setCalendarOpen(false);
                         }
                       }}
+                      disabled={!scheduledDateTime}
                       style={{
                         padding: '8px 24px',
                         background: scheduledDateTime
@@ -808,18 +812,15 @@ function App() {
                         border: 'none',
                         borderRadius: '6px',
                         fontWeight: '600',
-                        cursor: scheduledDateTime ? 'pointer' : 'not-allowed',
-                        transition: 'all 0.2s',
-                        fontSize: '0.95rem'
+                        cursor: scheduledDateTime ? 'pointer' : 'not-allowed'
                       }}
-                      disabled={!scheduledDateTime}
                     >
-                      ✓ Set
+                      ✓ Set Schedule
                     </button>
                   </div>
-                </DatePicker>
-              )}
-            </div>
+                </div>
+              </div>
+            )}
 
             <button
               type="submit"
