@@ -1,6 +1,8 @@
 import { useState, useRef } from 'react';
 import axios from 'axios';
 import { Upload, CheckCircle, XCircle, AlertCircle, FileVideo, Loader2, Power, X, Trash2, ArrowUp, ArrowDown, User, Calendar } from 'lucide-react';
+import DatePicker from 'react-datepicker';
+import 'react-datepicker/dist/react-datepicker.css';
 import './App.css';
 import ScheduledUploads from './ScheduledUploads';
 
@@ -20,7 +22,7 @@ function App() {
 
   // Scheduling feature
   const [isScheduled, setIsScheduled] = useState(false);
-  const [scheduledDateTime, setScheduledDateTime] = useState('');
+  const [scheduledDateTime, setScheduledDateTime] = useState(null); // Changed to Date object for DatePicker
   const [currentView, setCurrentView] = useState('upload'); // 'upload' or 'scheduled'
 
   // currentFileIndex tracks which file is currently being processed in the loop
@@ -693,13 +695,20 @@ function App() {
                     Select Date & Time
                   </label>
                   <div style={{ position: 'relative' }}>
-                    <input
-                      type="datetime-local"
-                      className="form-input"
-                      value={scheduledDateTime}
-                      onChange={(e) => setScheduledDateTime(e.target.value)}
-                      min={new Date().toISOString().slice(0, 16)}
+                    <DatePicker
+                      selected={scheduledDateTime}
+                      onChange={(date) => setScheduledDateTime(date)}
+                      showTimeSelect
+                      timeFormat="HH:mm"
+                      timeIntervals={15}
+                      dateFormat="MMMM d, yyyy h:mm aa"
+                      minDate={new Date()}
+                      placeholderText="Click to select date and time"
                       required={isScheduled}
+                      withPortal
+                      className="form-input"
+                      calendarClassName="custom-calendar"
+                      wrapperClassName="datepicker-wrapper"
                       style={{
                         padding: '0.75rem',
                         fontSize: '1rem',
@@ -710,7 +719,39 @@ function App() {
                         width: '100%',
                         transition: 'all 0.3s ease'
                       }}
-                    />
+                    >
+                      <div style={{
+                        display: 'flex',
+                        justifyContent: 'center',
+                        padding: '10px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+                      }}>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (scheduledDateTime) {
+                              // Close the calendar by blurring
+                              document.activeElement.blur();
+                            }
+                          }}
+                          style={{
+                            padding: '8px 24px',
+                            background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                            color: 'white',
+                            border: 'none',
+                            borderRadius: '6px',
+                            fontWeight: '600',
+                            cursor: scheduledDateTime ? 'pointer' : 'not-allowed',
+                            opacity: scheduledDateTime ? 1 : 0.5,
+                            transition: 'all 0.2s',
+                            fontSize: '0.95rem'
+                          }}
+                          disabled={!scheduledDateTime}
+                        >
+                          ✓ Set Schedule
+                        </button>
+                      </div>
+                    </DatePicker>
                     {scheduledDateTime && (
                       <div style={{
                         position: 'absolute',
@@ -745,7 +786,7 @@ function App() {
                         fontWeight: '500'
                       }}>
                         <Calendar size={16} />
-                        Scheduled for: {new Date(scheduledDateTime).toLocaleString('en-US', {
+                        Scheduled for: {scheduledDateTime.toLocaleString('en-US', {
                           year: 'numeric',
                           month: 'long',
                           day: 'numeric',
