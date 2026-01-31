@@ -2,7 +2,11 @@
   width: 100%;
   max-width: 600px;
   margin: 0 auto;
-  padding: 1rem;
+  padding: 1vh 1rem;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .glass-card {
@@ -10,20 +14,26 @@
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
   border: 1px solid var(--glass-border);
-  border-radius: 1.25rem;
-  padding: 1.5rem;
+  border-radius: 1rem;
+  padding: 1.5vh 1.5rem;
   box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.3);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .header {
   text-align: center;
-  margin-bottom: 1rem;
+  margin-bottom: 1vh;
+  flex-shrink: 0;
 }
 
 .header h1 {
-  font-size: 1.75rem;
+  font-size: clamp(1.25rem, 3vh, 1.75rem);
   font-weight: 700;
-  margin: 0 0 0.35rem 0;
+  margin: 0 0 0.5vh 0;
   background: linear-gradient(to right, #60a5fa, #c084fc);
   -webkit-background-clip: text;
   background-clip: text;
@@ -32,18 +42,18 @@
 
 .header p {
   color: var(--text-secondary);
-  font-size: 0.875rem;
+  font-size: clamp(0.75rem, 1.5vh, 0.875rem);
 }
 
 .form-group {
-  margin-bottom: 0.75rem;
+  margin-bottom: 1vh;
 }
 
 .form-label {
   display: block;
-  font-size: 0.85rem;
+  font-size: clamp(0.75rem, 1.5vh, 0.85rem);
   font-weight: 500;
-  margin-bottom: 0.35rem;
+  margin-bottom: 0.25vh;
   color: var(--text-secondary);
 }
 
@@ -53,10 +63,10 @@
   background: rgba(15, 23, 42, 0.6);
   border: 1px solid var(--glass-border);
   border-radius: 0.5rem;
-  padding: 0.5rem 0.75rem;
+  padding: 0.75vh 0.75rem;
   color: white;
   font-family: inherit;
-  font-size: 0.9rem;
+  font-size: clamp(0.8rem, 1.75vh, 0.9rem);
   transition: all 0.2s;
 }
 
@@ -68,14 +78,15 @@
 }
 
 .form-textarea {
-  min-height: 60px;
+  min-height: 6vh;
+  max-height: 12vh;
   resize: vertical;
 }
 
 .file-upload-zone {
   border: 2px dashed var(--glass-border);
   border-radius: 0.75rem;
-  padding: 1.25rem;
+  padding: 2vh 1rem;
   text-align: center;
   cursor: pointer;
   transition: all 0.2s;
