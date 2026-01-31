@@ -677,7 +677,7 @@ function App() {
               borderRadius: '8px',
               border: '1px solid rgba(139, 92, 246, 0.3)'
             }}>
-              {/* Schedule Section - Compact, no layout shift */}
+              {/* Schedule Section - Calendar auto-opens when checked */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -690,7 +690,15 @@ function App() {
                   checked={isScheduled}
                   onChange={(e) => {
                     setIsScheduled(e.target.checked);
-                    if (!e.target.checked) setScheduledDateTime(null);
+                    if (!e.target.checked) {
+                      setScheduledDateTime(null);
+                    } else {
+                      // Auto-open calendar when checked
+                      setTimeout(() => {
+                        const dateInput = document.querySelector('.schedule-datepicker input');
+                        if (dateInput) dateInput.click();
+                      }, 100);
+                    }
                   }}
                   style={{ width: '18px', height: '18px', accentColor: '#8b5cf6', cursor: 'pointer' }}
                 />
@@ -707,8 +715,48 @@ function App() {
                   Schedule for later?
                 </label>
 
+                {scheduledDateTime && (
+                  <div style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    padding: '0.35rem 0.75rem',
+                    background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(139, 92, 246, 0.1))',
+                    border: '1px solid rgba(139, 92, 246, 0.4)',
+                    borderRadius: '6px',
+                    fontSize: '0.85rem',
+                    color: '#a78bfa'
+                  }}>
+                    <Calendar size={14} />
+                    <span>{scheduledDateTime.toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const dateInput = document.querySelector('.schedule-datepicker input');
+                        if (dateInput) dateInput.click();
+                      }}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        color: '#a78bfa',
+                        cursor: 'pointer',
+                        padding: '0 4px',
+                        fontSize: '0.85rem',
+                        textDecoration: 'underline'
+                      }}
+                    >
+                      Change
+                    </button>
+                  </div>
+                )}
+
                 {isScheduled && (
-                  <div style={{ flex: '1 1 100%', marginTop: '0.5rem' }}>
+                  <div style={{ position: 'absolute', left: '-9999px', opacity: 0, pointerEvents: isScheduled && !scheduledDateTime ? 'auto' : 'none' }} className="schedule-datepicker">
                     <DatePicker
                       selected={scheduledDateTime}
                       onChange={(date) => setScheduledDateTime(date)}
@@ -717,10 +765,16 @@ function App() {
                       timeIntervals={30}
                       dateFormat="MMM d, yyyy h:mm aa"
                       minDate={new Date()}
-                      placeholderText="Click to select date and time"
+                      placeholderText="Select date and time"
                       required={isScheduled}
                       className="form-input"
                       calendarClassName="custom-calendar"
+                      open={isScheduled && !scheduledDateTime}
+                      onClickOutside={() => {
+                        if (!scheduledDateTime) {
+                          setIsScheduled(false);
+                        }
+                      }}
                       popperPlacement="bottom-start"
                       popperModifiers={[
                         {
