@@ -386,7 +386,7 @@ async def execute_scheduled_upload(upload_id: str):
             
             # Merge videos if merge_videos flag is True
             if merge_videos_flag and len(video_files) > 1:
-                merged_video_path = merge_videos(video_files)
+                merged_video_path = merge_videos(video_files, UPLOAD_DIR)
                 video_path = merged_video_path
             else:
                 # If not merging, use first video
