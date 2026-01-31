@@ -328,25 +328,46 @@ async def execute_scheduled_upload(upload_id: str):
                     raise Exception(f"Failed to download video from URL: {e}")
             return path_or_url
         
-        print(f"DEBUG: Processing video_path: {video_path!r}")
+        print(f"DEBUG: Processing video_path: {video_path!r} (Type: {type(video_path)})")
         
         try:
             # Try to parse as JSON (multiple files)
             parsed_files = None
-            try:
-                parsed_files = json.loads(video_path)
-            except json.JSONDecodeError:
-                # Fallback: if it looks like a list but failed JSON storage (e.g. single quotes)
-                if isinstance(video_path, str) and video_path.strip().startswith('[') and video_path.strip().endswith(']'):
-                    import ast
-                    try:
+            
+            # 0. Check if already a list (unlikely from DB but possible)
+            if isinstance(video_path, list):
+                parsed_files = video_path
+            
+            # 1. Try JSON
+            if parsed_files is None:
+                try:
+                    parsed_files = json.loads(video_path)
+                except (json.JSONDecodeError, TypeError):
+                    pass
+            
+            # 2. Try AST (for single quotes or Python list string)
+            if parsed_files is None:
+                try:
+                    if isinstance(video_path, str) and video_path.strip().startswith('[') and video_path.strip().endswith(']'):
+                        import ast
                         parsed_files = ast.literal_eval(video_path)
                         print("DEBUG: Parsed video_path using ast.literal_eval")
-                    except:
-                        pass
-                
-                if parsed_files is None:
-                    raise # Re-raise to go to outer except
+                except:
+                    pass
+            
+            # 3. Ultimate Fallback: Regex to find URLs
+            if parsed_files is None and isinstance(video_path, str) and 'http' in video_path:
+                import re
+                # Find http/https URLs that end with a quote or whitespace
+                # This pattern looks for http(s)://... until a quote, bracket, or whitespace
+                found_urls = re.findall(r'https?://[^"\'\]\s]+', video_path)
+                if found_urls:
+                    parsed_files = found_urls
+                    print(f"DEBUG: Parsed video_path using Regex, found {len(parsed_files)} URLs")
+
+            # Validate result
+            if parsed_files is None:
+                raise ValueError("Could not parse video_path")
 
             # Ensure it's a list
             if not isinstance(parsed_files, list):
@@ -356,6 +377,7 @@ async def execute_scheduled_upload(upload_id: str):
             for vf in parsed_files:
                 local_path = get_local_file_path(vf)
                 if not os.path.exists(local_path):
+                     print(f"DEBUG: Failed to find/download: {local_path} (Origin: {vf})")
                      raise HTTPException(
                         status_code=404,
                         detail=f"Video file not found locally or failed to download: {vf}"
@@ -371,12 +393,13 @@ async def execute_scheduled_upload(upload_id: str):
                 video_path = video_files[0]
                 
         except (json.JSONDecodeError, TypeError, ValueError) as e:
+            print(f"DEBUG: Parsing failed: {e}. Treating as single path.")
             # Single file path (not JSON)
             local_path = get_local_file_path(video_path)
             if not os.path.exists(local_path):
                 raise HTTPException(
                     status_code=404,
-                    detail=f"Video file not found: {video_path}"
+                    detail=f"Video file not found: {video_path} (Parse Error: {e})"
                 )
             video_files = [local_path]
             video_path = local_path
