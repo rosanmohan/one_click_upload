@@ -700,51 +700,49 @@ function App() {
                       onChange={(date) => setScheduledDateTime(date)}
                       showTimeSelect
                       timeFormat="HH:mm"
-                      timeIntervals={15}
+                      timeIntervals={30}
                       dateFormat="MMMM d, yyyy h:mm aa"
                       minDate={new Date()}
                       placeholderText="Click to select date and time"
                       required={isScheduled}
-                      withPortal
+                      inline
                       className="form-input"
                       calendarClassName="custom-calendar"
                       wrapperClassName="datepicker-wrapper"
-                      style={{
-                        padding: '0.75rem',
-                        fontSize: '1rem',
-                        background: 'rgba(255, 255, 255, 0.05)',
-                        border: scheduledDateTime ? '2px solid #8b5cf6' : '1px solid rgba(255, 255, 255, 0.1)',
-                        borderRadius: '8px',
-                        color: 'white',
-                        width: '100%',
-                        transition: 'all 0.3s ease'
-                      }}
                     >
                       <div style={{
                         display: 'flex',
                         justifyContent: 'center',
-                        padding: '10px',
-                        borderTop: '1px solid rgba(255, 255, 255, 0.1)'
+                        padding: '12px',
+                        borderTop: '1px solid rgba(255, 255, 255, 0.1)',
+                        background: 'rgba(31, 41, 55, 0.98)'
                       }}>
                         <button
                           type="button"
                           onClick={() => {
                             if (scheduledDateTime) {
-                              // Close the calendar by blurring
-                              document.activeElement.blur();
+                              // Scroll to confirmation
+                              setTimeout(() => {
+                                document.querySelector('.schedule-confirmation')?.scrollIntoView({
+                                  behavior: 'smooth',
+                                  block: 'nearest'
+                                });
+                              }, 100);
                             }
                           }}
                           style={{
-                            padding: '8px 24px',
-                            background: 'linear-gradient(135deg, #8b5cf6, #7c3aed)',
+                            padding: '10px 32px',
+                            background: scheduledDateTime
+                              ? 'linear-gradient(135deg, #8b5cf6, #7c3aed)'
+                              : 'rgba(139, 92, 246, 0.3)',
                             color: 'white',
                             border: 'none',
-                            borderRadius: '6px',
+                            borderRadius: '8px',
                             fontWeight: '600',
                             cursor: scheduledDateTime ? 'pointer' : 'not-allowed',
-                            opacity: scheduledDateTime ? 1 : 0.5,
                             transition: 'all 0.2s',
-                            fontSize: '0.95rem'
+                            fontSize: '1rem',
+                            boxShadow: scheduledDateTime ? '0 4px 12px rgba(139, 92, 246, 0.4)' : 'none'
                           }}
                           disabled={!scheduledDateTime}
                         >
@@ -752,47 +750,37 @@ function App() {
                         </button>
                       </div>
                     </DatePicker>
-                    {scheduledDateTime && (
-                      <div style={{
-                        position: 'absolute',
-                        right: '0.75rem',
-                        top: '50%',
-                        transform: 'translateY(-50%)',
-                        color: '#8b5cf6',
-                        fontSize: '1.25rem',
-                        pointerEvents: 'none'
-                      }}>
-                        ✓
-                      </div>
-                    )}
                   </div>
 
                   {/* Confirmation message */}
                   {scheduledDateTime && (
-                    <div style={{
-                      marginTop: '0.75rem',
-                      padding: '0.75rem',
-                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.1), rgba(139, 92, 246, 0.05))',
-                      border: '1px solid rgba(139, 92, 246, 0.3)',
-                      borderRadius: '8px',
+                    <div className="schedule-confirmation" style={{
+                      marginTop: '1rem',
+                      padding: '1rem',
+                      background: 'linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.05))',
+                      border: '2px solid rgba(139, 92, 246, 0.4)',
+                      borderRadius: '12px',
                       animation: 'pulse 2s ease-in-out infinite'
                     }}>
                       <div style={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: '0.5rem',
+                        gap: '0.75rem',
                         color: '#a78bfa',
-                        fontSize: '0.9rem',
-                        fontWeight: '500'
+                        fontSize: '1rem',
+                        fontWeight: '600'
                       }}>
-                        <Calendar size={16} />
-                        Scheduled for: {scheduledDateTime.toLocaleString('en-US', {
-                          year: 'numeric',
-                          month: 'long',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
+                        <Calendar size={20} />
+                        <div>
+                          <div style={{ fontSize: '0.85rem', color: '#9ca3af', marginBottom: '0.25rem' }}>Scheduled for:</div>
+                          {scheduledDateTime.toLocaleString('en-US', {
+                            year: 'numeric',
+                            month: 'long',
+                            day: 'numeric',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })}
+                        </div>
                       </div>
                     </div>
                   )}
