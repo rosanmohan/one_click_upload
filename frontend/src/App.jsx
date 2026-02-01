@@ -631,10 +631,10 @@ function App() {
               <input
                 type="text"
                 className="form-input"
-                placeholder={files.length > 1 ? "Ignored for multiple files (filenames will be used)" : "Amazing Video Title"}
+                placeholder={files.length > 1 && !mergeVideos ? "Ignored for multiple files (filenames will be used)" : "Amazing Video Title"}
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
-                disabled={files.length > 1}
+                disabled={files.length > 1 && !mergeVideos}
               />
             </div>
 
