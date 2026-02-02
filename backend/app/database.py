@@ -196,8 +196,32 @@ def create_scheduled_upload(
         "created_at": created_at
     }
 
+def cleanup_old_uploads():
+    """Delete completed uploads older than 24 hours."""
+    # Calculate cutoff time (24 hours ago)
+    from datetime import timedelta
+    cutoff_time = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    
+    # We first select the ones to delete to handle file cleanup if necessary, 
+    # but for now we trust delete_scheduled_upload or just do a bulk db delete.
+    # Bulk DB delete is safer for "log" cleanup, we assume files are already gone for completed uploads.
+    # The prompt says "log info should be keep for 24 hour", implying database records.
+    
+    execute_query("""
+        DELETE FROM scheduled_uploads 
+        WHERE status = 'completed' 
+        AND executed_at IS NOT NULL 
+        AND executed_at < ?
+    """, (cutoff_time,), commit=True)
+
 def get_scheduled_uploads(profile_id: Optional[str] = None, status: Optional[str] = None) -> List[Dict]:
     """Retrieve scheduled uploads with optional filtering."""
+    # Cleanup old completed uploads first
+    try:
+        cleanup_old_uploads()
+    except Exception as e:
+        logger.error(f"Failed to cleanup old uploads: {e}")
+
     query = "SELECT * FROM scheduled_uploads WHERE 1=1"
     params = []
     
@@ -209,7 +233,7 @@ def get_scheduled_uploads(profile_id: Optional[str] = None, status: Optional[str
         query += " AND status = ?"
         params.append(status)
     
-    query += " ORDER BY scheduled_time ASC"
+    query += " ORDER BY scheduled_time DESC"
     
     return execute_query(query, tuple(params), fetch_all=True)
 

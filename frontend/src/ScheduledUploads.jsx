@@ -5,7 +5,7 @@ import { Calendar, Clock, Trash2, RefreshCw, CheckCircle, XCircle, Loader2, Yout
 function ScheduledUploads({ baseUrl }) {
     const [uploads, setUploads] = useState([]);
     const [loading, setLoading] = useState(true);
-    const [filter, setFilter] = useState('all'); // all, pending, completed, failed
+    const [filter, setFilter] = useState('pending'); // pending, completed, failed, all
 
     useEffect(() => {
         fetchScheduledUploads();
@@ -20,7 +20,12 @@ function ScheduledUploads({ baseUrl }) {
             }
 
             const response = await axios.get(`${baseUrl}/api/scheduled/list`, { params });
-            setUploads(response.data.uploads || []);
+            let fetchedUploads = response.data.uploads || [];
+
+            // Sort by scheduled_time descending (latest first)
+            fetchedUploads.sort((a, b) => new Date(b.scheduled_time) - new Date(a.scheduled_time));
+
+            setUploads(fetchedUploads);
         } catch (error) {
             console.error('Failed to fetch scheduled uploads:', error);
         } finally {
@@ -78,12 +83,6 @@ function ScheduledUploads({ baseUrl }) {
 
             <div className="filter-tabs">
                 <button
-                    className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
-                    onClick={() => setFilter('all')}
-                >
-                    All
-                </button>
-                <button
                     className={`filter-tab ${filter === 'pending' ? 'active' : ''}`}
                     onClick={() => setFilter('pending')}
                 >
@@ -100,6 +99,12 @@ function ScheduledUploads({ baseUrl }) {
                     onClick={() => setFilter('failed')}
                 >
                     Failed
+                </button>
+                <button
+                    className={`filter-tab ${filter === 'all' ? 'active' : ''}`}
+                    onClick={() => setFilter('all')}
+                >
+                    All
                 </button>
             </div>
 
