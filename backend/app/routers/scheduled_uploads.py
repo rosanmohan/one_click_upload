@@ -463,12 +463,27 @@ async def execute_scheduled_upload(upload_id: str):
         
         if upload.get('upload_instagram') and settings.UPLOAD_INSTAGRAM:
             try:
-                # Fix: Instagram needs a public URL, so upload to Cloudinary first
-                cld_result = upload_video_to_cloudinary(video_path)
-                
-                if cld_result and cld_result.get('url'):
-                    video_url = cld_result.get('url')
-                    
+                # Fix: Instagram needs a public URL.
+                # Check if video_path is already a Cloudinary URL
+                video_url = None
+                uploaded_to_cloudinary = False
+                public_id_to_delete = None
+
+                if "res.cloudinary.com" in video_path:
+                     video_url = video_path
+                     print(f"DEBUG: Using existing Cloudinary URL for Instagram: {video_url}")
+                else:
+                    # Upload to Cloudinary
+                    print("DEBUG: Uploading to Cloudinary for Instagram...")
+                    cld_result = upload_video_to_cloudinary(video_path)
+                    if cld_result and cld_result.get('url'):
+                        video_url = cld_result.get('url')
+                        public_id_to_delete = cld_result.get('public_id')
+                        uploaded_to_cloudinary = True
+                    else:
+                        errors.append("Instagram: Failed to upload to Cloudinary")
+
+                if video_url:
                     ig_result = upload_to_instagram(
                         video_url=video_url,
                         caption=description,
@@ -482,10 +497,10 @@ async def execute_scheduled_upload(upload_id: str):
                     else:
                         errors.append(f"Instagram: {ig_result.get('message', 'Unknown error')}")
                         
-                    # Cleanup Cloudinary (optional, but good practice if checking storage)
-                    # delete_video_from_cloudinary(cld_result.get('public_id'))
-                else:
-                    errors.append("Instagram: Failed to upload to Cloudinary (required for Instagram)")
+                    # Cleanup Cloudinary if we uploaded it just for this
+                    if uploaded_to_cloudinary and public_id_to_delete:
+                        print(f"DEBUG: Deleting temp Cloudinary video: {public_id_to_delete}")
+                        delete_video_from_cloudinary(public_id_to_delete)
                     
             except Exception as e:
                 errors.append(f"Instagram: {str(e)}")
